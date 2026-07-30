@@ -6,123 +6,43 @@
 <title>Stream Viewer</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body {
-  width: 100%; height: 100%;
-  background: #080808;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  color: #e0e0e0;
-  overflow: hidden;
-}
+html, body { width: 100%; height: 100%; background: #080808; overflow: hidden; }
 
 #top-bar {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  height: 44px;
-  background: rgba(10,10,10,0.92);
-  backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 18px;
-  z-index: 100;
-  border-bottom: 1px solid #1a1a1a;
+  position: fixed; top: 0; left: 0; right: 0; height: 44px;
+  background: rgba(8,8,8,.92); backdrop-filter: blur(12px);
+  display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  z-index: 100; border-bottom: 1px solid #141414;
 }
-
-#dot {
-  width: 9px; height: 9px;
-  border-radius: 50%;
-  background: #333;
-  transition: background 0.4s, box-shadow 0.4s;
-  flex-shrink: 0;
-}
+#dot { width: 9px; height: 9px; border-radius: 50%; background: #222; transition: background .4s, box-shadow .4s; flex-shrink: 0; }
 #dot.live { background: #22c55e; box-shadow: 0 0 8px #22c55e99; animation: pulse 2s infinite; }
 #dot.offline { background: #ef4444; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 6px #22c55e66} 50%{box-shadow:0 0 16px #22c55ecc} }
 
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 0 6px #22c55e88; }
-  50% { box-shadow: 0 0 14px #22c55ecc; }
-}
+#status-label { font-family: 'Segoe UI', system-ui, sans-serif; font-size: .82rem; color: #666; letter-spacing: .02em; flex: 1; }
+#info-label   { font-family: 'Segoe UI', system-ui, sans-serif; font-size: .72rem; color: #333; font-variant-numeric: tabular-nums; }
 
-#status-label {
-  font-size: 0.82rem;
-  color: #888;
-  letter-spacing: 0.02em;
-  flex: 1;
-}
-
-#fps-label { font-size: 0.75rem; color: #444; }
-
-/* Viewer modes */
 #view-area {
-  width: 100vw;
-  height: 100vh;
-  padding-top: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #080808;
+  width: 100vw; height: 100vh; padding-top: 44px;
+  display: flex; align-items: center; justify-content: center; background: #080808;
 }
-
-/* MJPEG img — browser renders this natively like video */
-#mjpeg-img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: block;
+#stream-video {
+  max-width: 100%; max-height: 100%; object-fit: contain; display: none; background: #000;
 }
+/* MJPEG fallback */
+#mjpeg-img { max-width: 100%; max-height: 100%; object-fit: contain; display: none; }
 
-/* Canvas fallback */
-#stream-canvas {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: none;
-}
-
-/* Overlay shown while waiting */
+/* Overlay */
 #overlay {
-  position: fixed;
-  inset: 44px 0 0 0;
-  background: #080808;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  z-index: 50;
+  position: fixed; inset: 44px 0 0 0; background: #080808;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 50;
 }
-
-.spinner {
-  width: 36px; height: 36px;
-  border: 3px solid #1e1e1e;
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
+.spinner { width: 32px; height: 32px; border: 3px solid #1a1a1a; border-top-color: #3b82f6; border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+#overlay-text { font-family: 'Segoe UI', system-ui, sans-serif; font-size: .84rem; color: #444; text-align: center; max-width: 260px; line-height: 1.6; }
 
-#overlay-text {
-  font-size: 0.88rem;
-  color: #555;
-  text-align: center;
-  max-width: 280px;
-  line-height: 1.6;
-}
-
-#streamer-link {
-  font-size: 0.75rem;
-  color: #333;
-  text-decoration: none;
-  position: fixed;
-  bottom: 14px;
-  right: 16px;
-  transition: color 0.2s;
-}
-#streamer-link:hover { color: #555; }
+#streamer-link { font-family: 'Segoe UI', system-ui, sans-serif; font-size: .72rem; color: #252525; text-decoration: none; position: fixed; bottom: 12px; right: 14px; }
+#streamer-link:hover { color: #444; }
 </style>
 </head>
 <body>
@@ -130,14 +50,14 @@ html, body {
 <div id="top-bar">
   <div id="dot"></div>
   <span id="status-label">Đang kết nối...</span>
-  <span id="fps-label"></span>
+  <span id="info-label"></span>
 </div>
 
 <div id="view-area">
-  <!-- Primary: MJPEG — zero-JS per-frame, native browser decode, buttery smooth -->
+  <!-- Primary: native <video> element fed by MSE (WebM/VP8/VP9) -->
+  <video id="stream-video" autoplay muted playsinline></video>
+  <!-- Fallback: MJPEG (for browsers without MSE) -->
   <img id="mjpeg-img" alt="stream" />
-  <!-- Fallback: WebSocket canvas -->
-  <canvas id="stream-canvas"></canvas>
 </div>
 
 <div id="overlay">
@@ -148,164 +68,197 @@ html, body {
 <a id="streamer-link" href="/" target="_blank">Streamer →</a>
 
 <script>
-const BASE = location.protocol === "file:"
-  ? "https://lonelyhubstreaming.onrender.com"
-  : location.origin;
+const BASE       = location.protocol === 'file:' ? 'https://lonelyhubstreaming.onrender.com' : location.origin;
+const WS_BASE    = BASE.replace(/^https/, 'wss').replace(/^http/, 'ws');
+const STATUS_URL = BASE + '/api/status';
+const MJPEG_URL  = BASE + '/api/stream';
+const WS_URL     = WS_BASE + '/ws?role=viewer';
 
-const WS_BASE = BASE.replace(/^https/, "wss").replace(/^http/, "ws");
-const STATUS_URL = BASE + "/api/status";
-const MJPEG_URL = BASE + "/api/stream";
-const WS_VIEWER_URL = WS_BASE + "/ws?role=viewer";
+const dot         = document.getElementById('dot');
+const statusLabel = document.getElementById('status-label');
+const infoLabel   = document.getElementById('info-label');
+const overlay     = document.getElementById('overlay');
+const overlayText = document.getElementById('overlay-text');
+const streamVideo = document.getElementById('stream-video');
+const mjpegImg    = document.getElementById('mjpeg-img');
 
-const dot = document.getElementById("dot");
-const statusLabel = document.getElementById("status-label");
-const fpsLabel = document.getElementById("fps-label");
-const overlay = document.getElementById("overlay");
-const overlayText = document.getElementById("overlay-text");
-const mjpegImg = document.getElementById("mjpeg-img");
-const canvas = document.getElementById("stream-canvas");
-const ctx = canvas.getContext("2d");
+// ── State ─────────────────────────────────────────────────────────
+let ws             = null;
+let mediaSource    = null;
+let sourceBuffer   = null;
+let chunkQueue     = [];        // chunks waiting to be appended to SourceBuffer
+let sbReady        = false;
+let useMse         = typeof MediaSource !== 'undefined';
+let bytesReceived  = 0;
+let connected      = false;
+let statsTimer     = null;
 
-let connected = false;
-let usingMjpeg = true;
-let ws = null;
-let frameCount = 0;
-let lastFpsTime = performance.now();
-let lastFrameAt = 0;
-
-// --- MJPEG approach: just set img src, browser does everything ---
-function startMjpeg() {
-  usingMjpeg = true;
-  mjpegImg.style.display = "block";
-  canvas.style.display = "none";
-  // Append timestamp to force reconnect on refresh
-  mjpegImg.src = MJPEG_URL + "?t=" + Date.now();
-
-  mjpegImg.onload = () => {};
-
-  mjpegImg.onerror = () => {
-    // MJPEG not available (e.g. server restart), fall back to WebSocket
-    console.warn("MJPEG error, falling back to WebSocket");
-    mjpegImg.style.display = "none";
-    startWsViewer();
-  };
+// ── UI helpers ────────────────────────────────────────────────────
+function setConnected(on) {
+  connected = on;
+  dot.className = on ? 'live' : 'offline';
+  statusLabel.textContent = on ? 'LIVE' : 'Streamer ngoại tuyến';
+  overlay.style.display = on ? 'none' : 'flex';
+  if (!on) { infoLabel.textContent = ''; overlayText.textContent = 'Đang chờ streamer kết nối...'; }
 }
 
-// --- WebSocket fallback: canvas rendering ---
-function startWsViewer() {
-  usingMjpeg = false;
-  canvas.style.display = "block";
-  mjpegImg.style.display = "none";
-
-  if (ws) { ws.close(); ws = null; }
-
-  ws = new WebSocket(WS_VIEWER_URL);
-  ws.binaryType = "arraybuffer";
-
-  let prevUrl = null;
-  let nextImg = new Image();
-  let pendingFrame = null;
-  let rendering = false;
-
-  function renderNext() {
-    if (!pendingFrame || rendering) return;
-    rendering = true;
-    const frameData = pendingFrame;
-    pendingFrame = null;
-
-    const blob = new Blob([frameData], { type: "image/jpeg" });
-    const url = URL.createObjectURL(blob);
-    nextImg.onload = () => {
-      // Resize canvas once to match stream
-      if (canvas.width !== nextImg.naturalWidth || canvas.height !== nextImg.naturalHeight) {
-        canvas.width = nextImg.naturalWidth;
-        canvas.height = nextImg.naturalHeight;
-      }
-      ctx.drawImage(nextImg, 0, 0);
-      if (prevUrl) URL.revokeObjectURL(prevUrl);
-      prevUrl = url;
-      rendering = false;
-      // Immediately render next if queued
-      requestAnimationFrame(renderNext);
-
-      // FPS counter
-      frameCount++;
-      const now = performance.now();
-      if (now - lastFpsTime >= 1000) {
-        fpsLabel.textContent = Math.round(frameCount * 1000 / (now - lastFpsTime)) + " fps";
-        frameCount = 0;
-        lastFpsTime = now;
-      }
-      lastFrameAt = now;
-    };
-    nextImg.onerror = () => { URL.revokeObjectURL(url); rendering = false; };
-    nextImg.src = url;
+// ── MSE setup ─────────────────────────────────────────────────────
+function initMSE(codec) {
+  // Tear down any previous MSE session
+  if (mediaSource) {
+    try { if (mediaSource.readyState === 'open') mediaSource.endOfStream(); } catch (_) {}
+    mediaSource = null;
   }
+  if (streamVideo.src) { URL.revokeObjectURL(streamVideo.src); streamVideo.src = ''; }
+  sourceBuffer = null;
+  sbReady = false;
+  chunkQueue = [];
 
-  ws.onmessage = (e) => {
-    if (e.data instanceof ArrayBuffer) {
-      pendingFrame = e.data; // Always take latest, drop stale
-      requestAnimationFrame(renderNext);
-    } else {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === "status") {
-          setConnected(msg.connected);
-        }
-      } catch (_) {}
+  mediaSource = new MediaSource();
+  streamVideo.src = URL.createObjectURL(mediaSource);
+  streamVideo.style.display = 'block';
+  mjpegImg.style.display = 'none';
+
+  mediaSource.addEventListener('sourceopen', () => {
+    try {
+      sourceBuffer = mediaSource.addSourceBuffer(codec);
+      sourceBuffer.mode = 'sequence'; // critical for streaming
+    } catch (e) {
+      console.warn('MSE addSourceBuffer failed:', e.message, '— falling back to MJPEG');
+      fallbackMjpeg();
+      return;
     }
-  };
 
-  ws.onclose = () => {
-    setConnected(false);
-    setTimeout(startWsViewer, 2000);
-  };
-  ws.onerror = () => ws.close();
+    sourceBuffer.addEventListener('updateend', flushQueue);
+    sbReady = true;
+    flushQueue(); // drain anything that arrived early
+  });
+
+  mediaSource.addEventListener('error', () => { console.warn('MediaSource error — falling back'); fallbackMjpeg(); });
+  streamVideo.addEventListener('error', (e) => { if (useMse) { console.warn('Video error', e); fallbackMjpeg(); } });
 }
 
-function setConnected(isConnected) {
-  connected = isConnected;
-  if (isConnected) {
-    dot.className = "live";
-    statusLabel.textContent = "LIVE";
-    overlay.style.display = "none";
-  } else {
-    dot.className = "offline";
-    statusLabel.textContent = "Streamer ngoại tuyến";
-    fpsLabel.textContent = "";
-    overlay.style.display = "flex";
-    overlayText.textContent = "Đang chờ streamer kết nối...";
-  }
-}
+function flushQueue() {
+  if (!sourceBuffer || sourceBuffer.updating || chunkQueue.length === 0) return;
 
-// Poll status to know when streamer connects/disconnects (for MJPEG mode)
-async function pollStatus() {
+  // Trim buffer to prevent unbounded growth (keep last ~20s)
   try {
-    const r = await fetch(STATUS_URL, { cache: "no-store" });
-    if (r.ok) {
-      const d = await r.json();
-      setConnected(d.connected);
+    if (sourceBuffer.buffered.length > 0) {
+      const end   = sourceBuffer.buffered.end(sourceBuffer.buffered.length - 1);
+      const start = sourceBuffer.buffered.start(0);
+      if (end - start > 25) {
+        sourceBuffer.remove(start, end - 15);
+        return; // updateend will re-fire flushQueue after remove finishes
+      }
     }
   } catch (_) {}
+
+  try {
+    const chunk = chunkQueue.shift();
+    sourceBuffer.appendBuffer(chunk);
+    bytesReceived += chunk.byteLength;
+  } catch (e) {
+    if (e.name === 'QuotaExceededError') {
+      chunkQueue = []; // flush queue and wait for new keyframe
+    }
+  }
 }
 
-// Monitor frame freshness when using MJPEG
-// (MJPEG img keeps updating on its own; just poll status)
-setInterval(pollStatus, 2000);
-
-// Start with MJPEG — smoothest possible, zero JS per frame
-pollStatus().then(() => {
-  startMjpeg();
-});
-
-// If MJPEG is live and we want FPS counter — count via mutation/timing trick
-// (img element doesn't fire per-frame events in MJPEG mode)
-// We use a separate lightweight probe for FPS estimation
-let mjpegFrameCount = 0;
-if (typeof MutationObserver !== "undefined") {
-  // Lightweight: count via natural image size changes if stream resolution changes
-  // Mostly we just show "LIVE" for MJPEG
+function appendChunk(data) {
+  if (!sbReady || !sourceBuffer) {
+    chunkQueue.push(data);
+    return;
+  }
+  if (sourceBuffer.updating) {
+    chunkQueue.push(data);
+  } else {
+    chunkQueue.push(data);
+    flushQueue();
+  }
 }
+
+// ── MJPEG fallback ────────────────────────────────────────────────
+function fallbackMjpeg() {
+  useMse = false;
+  streamVideo.style.display = 'none';
+  mjpegImg.style.display    = 'block';
+  mjpegImg.src = MJPEG_URL + '?t=' + Date.now();
+  mjpegImg.onerror = () => setTimeout(() => { mjpegImg.src = MJPEG_URL + '?t=' + Date.now(); }, 3000);
+}
+
+// ── WebSocket viewer ──────────────────────────────────────────────
+function connectViewer() {
+  if (ws) { ws.close(); ws = null; }
+  ws = new WebSocket(WS_URL);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => { overlayText.textContent = 'Đang chờ streamer...'; };
+
+  ws.onmessage = (e) => {
+    if (typeof e.data === 'string') {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'status') {
+          setConnected(msg.connected);
+          if (!msg.connected) {
+            // Reset MSE for next stream session
+            sourceBuffer = null; sbReady = false; chunkQueue = [];
+          }
+        } else if (msg.type === 'codec' && useMse) {
+          // Streamer announced codec — set up MSE
+          if (MediaSource.isTypeSupported(msg.value)) {
+            initMSE(msg.value);
+          } else {
+            console.warn('Codec not supported by this browser:', msg.value, '— using MJPEG');
+            fallbackMjpeg();
+          }
+        }
+      } catch (_) {}
+      return;
+    }
+
+    // Binary: WebM chunk
+    if (!(e.data instanceof ArrayBuffer)) return;
+
+    if (useMse) {
+      appendChunk(e.data);
+    }
+    // (MJPEG path doesn't need binary data from WS)
+  };
+
+  ws.onclose  = () => setTimeout(connectViewer, 2000);
+  ws.onerror  = () => ws.close();
+}
+
+// ── Stats ─────────────────────────────────────────────────────────
+function startStats() {
+  let prev = 0;
+  statsTimer = setInterval(() => {
+    if (!connected) { infoLabel.textContent = ''; return; }
+    const kbps = Math.round((bytesReceived - prev) * 8 / 1000);
+    infoLabel.textContent = kbps > 0 ? kbps + ' kbps' : '';
+    prev = bytesReceived;
+  }, 1000);
+}
+
+// ── Poll status (for MJPEG mode where no WS binary comes through) ─
+setInterval(async () => {
+  try {
+    const r = await fetch(STATUS_URL, { cache: 'no-store' });
+    if (r.ok) {
+      const d = await r.json();
+      // Only override if WS isn't already tracking status
+      if (!ws || ws.readyState !== WebSocket.OPEN) setConnected(d.connected);
+    }
+  } catch (_) {}
+}, 3000);
+
+// ── Boot ──────────────────────────────────────────────────────────
+connectViewer();
+startStats();
+
+// If MSE is not available, go straight to MJPEG
+if (!useMse) fallbackMjpeg();
 </script>
 </body>
 </html>
