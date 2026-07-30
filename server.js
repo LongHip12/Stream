@@ -11,15 +11,15 @@ let streamerSocket    = null;
 let streamerConnected = false;
 
 let latestJpeg = null;
-const mjpegClients = new Set();
+const mjpegClients  = new Set();
+const wsViewers     = new Set();
+const jpegViewers   = new Set();
 
 let webmCodec        = null;
 let webmInitChunks   = [];
 let webmRecentChunks = [];
 const INIT_CHUNK_COUNT = 6;
 const MAX_RECENT       = 30;
-
-const wsViewers = new Set();
 
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -34,7 +34,7 @@ app.get("/",        (_, res) => res.sendFile(path.join(__dirname, "index.html"))
 app.get("/viewer",  (_, res) => res.sendFile(path.join(__dirname, "viewer.html")));
 
 app.get("/api/status", (_, res) =>
-  res.json({ connected: streamerConnected, viewers: mjpegClients.size + wsViewers.size })
+  res.json({ connected: streamerConnected, viewers: mjpegClients.size + wsViewers.size + jpegViewers.size })
 );
 
 app.get("/api/frame/latest.jpg", (_, res) => {
@@ -65,6 +65,11 @@ function pushMjpeg(res, frame) {
 
 function broadcastJpeg(frame) {
   for (const c of mjpegClients) pushMjpeg(c, frame);
+  for (const v of jpegViewers) {
+    if (v.readyState === 1) {
+      try { v.send(frame); } catch (_) { jpegViewers.delete(v); }
+    }
+  }
 }
 
 function broadcastWebm(chunk) {
@@ -75,15 +80,19 @@ function broadcastWebm(chunk) {
   }
 }
 
+function sendJson(ws, obj) {
+  try { ws.send(JSON.stringify(obj)); } catch (_) {}
+}
+
 wss.on("connection", (ws, req) => {
   const url  = new URL(req.url || "/", "http://x");
   const role = url.searchParams.get("role");
 
   if (role === "viewer") {
     wsViewers.add(ws);
-    ws.send(JSON.stringify({ type: "status", connected: streamerConnected }));
+    sendJson(ws, { type: "status", connected: streamerConnected });
     if (webmCodec && streamerConnected) {
-      ws.send(JSON.stringify({ type: "codec", value: webmCodec }));
+      sendJson(ws, { type: "codec", value: webmCodec });
       const catchup = [...webmInitChunks, ...webmRecentChunks];
       for (const chunk of catchup) {
         try { ws.send(chunk); } catch (_) {}
@@ -91,6 +100,17 @@ wss.on("connection", (ws, req) => {
     }
     ws.on("close",  () => wsViewers.delete(ws));
     ws.on("error",  () => wsViewers.delete(ws));
+    return;
+  }
+
+  if (role === "jpeg-viewer") {
+    jpegViewers.add(ws);
+    sendJson(ws, { type: "status", connected: streamerConnected });
+    if (latestJpeg && streamerConnected) {
+      try { ws.send(latestJpeg); } catch (_) {}
+    }
+    ws.on("close",  () => jpegViewers.delete(ws));
+    ws.on("error",  () => jpegViewers.delete(ws));
     return;
   }
 
@@ -103,10 +123,8 @@ wss.on("connection", (ws, req) => {
   webmCodec        = null;
   latestJpeg       = null;
 
-  for (const v of wsViewers) {
-    if (v.readyState === 1)
-      v.send(JSON.stringify({ type: "status", connected: true }));
-  }
+  for (const v of wsViewers)   if (v.readyState === 1) sendJson(v, { type: "status", connected: true });
+  for (const v of jpegViewers) if (v.readyState === 1) sendJson(v, { type: "status", connected: true });
 
   ws.on("message", (data, isBinary) => {
     if (!isBinary) {
@@ -117,8 +135,7 @@ wss.on("connection", (ws, req) => {
           webmInitChunks   = [];
           webmRecentChunks = [];
           for (const v of wsViewers) {
-            if (v.readyState === 1)
-              v.send(JSON.stringify({ type: "codec", value: webmCodec }));
+            if (v.readyState === 1) sendJson(v, { type: "codec", value: webmCodec });
           }
         }
       } catch (_) {}
@@ -139,7 +156,6 @@ wss.on("connection", (ws, req) => {
       webmRecentChunks.push(buf);
       if (webmRecentChunks.length > MAX_RECENT) webmRecentChunks.shift();
     }
-
     broadcastWebm(buf);
   });
 
@@ -148,10 +164,8 @@ wss.on("connection", (ws, req) => {
     streamerConnected = false;
     streamerSocket    = null;
     latestJpeg        = null;
-    for (const v of wsViewers) {
-      if (v.readyState === 1)
-        v.send(JSON.stringify({ type: "status", connected: false }));
-    }
+    for (const v of wsViewers)   if (v.readyState === 1) sendJson(v, { type: "status", connected: false });
+    for (const v of jpegViewers) if (v.readyState === 1) sendJson(v, { type: "status", connected: false });
   };
   ws.on("close", onClose);
   ws.on("error", onClose);

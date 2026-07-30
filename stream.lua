@@ -1,53 +1,25 @@
 local SERVER = "https://lonelyhubstreaming.onrender.com"
-local FRAME_URL = SERVER .. "/api/frame/latest.jpg"
-local STATUS_URL = SERVER .. "/api/status"
+local WS_URL = SERVER:gsub("https://", "wss://"):gsub("http://", "ws://") .. "/ws?role=jpeg-viewer"
 
 local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local Players     = game:GetService("Players")
+local RunService  = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
 
-local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
-
-local WORKER_COUNT     = 3
-local BUF_SLOTS        = 9
 local DISPLAY_FPS      = 30
 local DISPLAY_INTERVAL = 1 / DISPLAY_FPS
-local STATUS_INTERVAL  = 2
 local MAX_QUEUE        = 4
+local SLOT_COUNT       = 3
 
-local running          = false
-local hasFirstFrame    = false
-local lastDisplayTime  = 0
-local lastStatusTime   = 0
-local frameConnection  = nil
-
-local frameQueue = {}
-
-local function safeRequest(url)
-    if not httpRequest then return nil end
-    local ok, res = pcall(function()
-        return httpRequest({
-            Url = url,
-            Method = "GET",
-            Headers = {
-                ["Cache-Control"] = "no-cache, no-store",
-                ["Pragma"] = "no-cache",
-            }
-        })
-    end)
-    if ok then return res end
-    return nil
-end
-
-local function isConnected()
-    local res = safeRequest(STATUS_URL)
-    if not res or res.StatusCode ~= 200 then return false end
-    local ok, data = pcall(HttpService.JSONDecode, HttpService, res.Body)
-    return ok and data and data.connected == true
-end
+local connected       = false
+local hasFirstFrame   = false
+local lastDisplayTime = 0
+local frameConnection = nil
+local writeSlot       = 1
+local frameQueue      = {}
+local destroyed       = false
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "StreamViewer"
@@ -214,7 +186,7 @@ local dragStart, startPos
 
 titleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
+        dragging  = true
         dragStart = input.Position
         startPos  = mainFrame.Position
     end
@@ -223,31 +195,15 @@ end)
 titleBar.InputChanged:Connect(function(input)
     if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local d = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X,
-                                       startPos.Y.Scale, startPos.Y.Offset + d.Y)
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + d.X,
+            startPos.Y.Scale, startPos.Y.Offset + d.Y
+        )
     end
 end)
 
 game:GetService("UserInputService").InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-end)
-
-local function stopStream()
-    running = false
-    hasFirstFrame = false
-    frameQueue = {}
-    setDot(false)
-    showOverlay(true)
-    setStatus("Stream stopped.", Color3.fromRGB(239, 68, 68))
-    streamImageA.Image = ""
-    streamImageB.Image = ""
-    titleLabel.Text = "Stream Viewer"
-end
-
-closeBtn.MouseButton1Click:Connect(function()
-    stopStream()
-    if frameConnection then frameConnection:Disconnect() end
-    screenGui:Destroy()
 end)
 
 local function pushFrame(asset)
@@ -257,100 +213,120 @@ local function pushFrame(asset)
     table.insert(frameQueue, asset)
 end
 
-local function startWorker(slotStart)
-    task.spawn(function()
-        local slot = slotStart
-        while true do
-            if running then
-                local res = safeRequest(FRAME_URL)
-                if res and res.StatusCode == 200 and res.Body and #res.Body > 800 then
-                    local fname = "ss_" .. slot .. ".jpg"
-                    local writeOk = pcall(writefile, fname, res.Body)
-                    if writeOk then
-                        local asset
-                        pcall(function() asset = getcustomasset(fname) end)
-                        if asset and asset ~= "" then
-                            pushFrame(asset)
-                            if not hasFirstFrame then
-                                hasFirstFrame = true
-                                showOverlay(false)
-                            end
-                        end
-                    end
-                    slot = (slot % 3) + slotStart
-                end
-            end
-            task.wait(0.008)
-        end
-    end)
+local function onConnected()
+    connected     = true
+    hasFirstFrame = false
+    frameQueue    = {}
+    setDot(true)
+    showOverlay(true)
+    setStatus("Đang tải frame đầu tiên...", Color3.fromRGB(100, 180, 255))
+    titleLabel.Text = "Stream Viewer · LIVE"
 end
 
-for i = 1, WORKER_COUNT do
-    startWorker((i - 1) * 3 + 1)
+local function onDisconnected()
+    connected     = false
+    hasFirstFrame = false
+    frameQueue    = {}
+    setDot(false)
+    showOverlay(true)
+    setStatus("Streamer ngoại tuyến", Color3.fromRGB(239, 68, 68))
+    streamImageA.Image = ""
+    streamImageB.Image = ""
+    titleLabel.Text = "Stream Viewer"
+end
+
+local function processFrame(data)
+    local fname = "sv_" .. writeSlot .. ".jpg"
+    writeSlot = (writeSlot % SLOT_COUNT) + 1
+    local ok = pcall(writefile, fname, data)
+    if not ok then return end
+    local asset
+    pcall(function() asset = getcustomasset(fname) end)
+    if not asset or asset == "" then return end
+    pushFrame(asset)
+    if not hasFirstFrame then
+        hasFirstFrame = true
+        showOverlay(false)
+    end
 end
 
 local function displayNextFrame()
     if #frameQueue == 0 then return end
     local asset
     if #frameQueue >= MAX_QUEUE then
-        asset = frameQueue[#frameQueue]
+        asset      = frameQueue[#frameQueue]
         frameQueue = {}
     else
         asset = table.remove(frameQueue, 1)
     end
-    inactiveImage.Image = asset
+    inactiveImage.Image  = asset
     inactiveImage.ZIndex = 3
-    activeImage.ZIndex = 2
+    activeImage.ZIndex   = 2
     activeImage, inactiveImage = inactiveImage, activeImage
 end
 
-local isCheckingStatus = false
+local function connectWS()
+    if destroyed then return end
+
+    setStatus("Đang kết nối...", Color3.fromRGB(150, 150, 150))
+
+    local ok, ws = pcall(WebSocket.connect, WS_URL)
+    if not ok or not ws then
+        task.delay(2, connectWS)
+        return
+    end
+
+    ws.OnMessage:Connect(function(msg)
+        if destroyed then return end
+        if type(msg) ~= "string" or #msg == 0 then return end
+
+        local b1, b2 = msg:byte(1, 2)
+        if b1 == 0xFF and b2 == 0xD8 then
+            if connected then processFrame(msg) end
+            return
+        end
+
+        local parsed, data = pcall(HttpService.JSONDecode, HttpService, msg)
+        if not parsed then return end
+
+        if data.type == "status" then
+            if data.connected and not connected then
+                onConnected()
+            elseif not data.connected and connected then
+                onDisconnected()
+            elseif not data.connected then
+                setStatus("Đang chờ streamer...", Color3.fromRGB(150, 150, 150))
+                showOverlay(true)
+            end
+        end
+    end)
+
+    ws.OnClose:Connect(function()
+        if destroyed then return end
+        connected = false
+        setStatus("Mất kết nối, thử lại...", Color3.fromRGB(200, 150, 50))
+        task.delay(2, connectWS)
+    end)
+end
+
+closeBtn.MouseButton1Click:Connect(function()
+    destroyed = true
+    if frameConnection then frameConnection:Disconnect() end
+    screenGui:Destroy()
+end)
 
 local function mainLoop()
+    if destroyed then return end
     local now = tick()
-    if now - lastStatusTime >= STATUS_INTERVAL and not isCheckingStatus then
-        lastStatusTime = now
-        isCheckingStatus = true
-        task.spawn(function()
-            pcall(function()
-                local conn = isConnected()
-                if not conn and running then
-                    stopStream()
-                    setStatus("Streamer đã ngắt kết nối.", Color3.fromRGB(239, 68, 68))
-                elseif conn and not running then
-                    running = true
-                    hasFirstFrame = false
-                    frameQueue = {}
-                    setDot(true)
-                    showOverlay(true)
-                    setStatus("Đang tải frame đầu tiên...", Color3.fromRGB(100, 180, 255))
-                    titleLabel.Text = "Stream Viewer · LIVE"
-                end
-            end)
-            isCheckingStatus = false
-        end)
-    end
-    if running and now - lastDisplayTime >= DISPLAY_INTERVAL then
+    if connected and now - lastDisplayTime >= DISPLAY_INTERVAL then
         lastDisplayTime = now
         displayNextFrame()
     end
 end
 
-setStatus("Đang kết nối tới server...", Color3.fromRGB(150, 150, 150))
 showOverlay(true)
+setStatus("Đang kết nối tới server...", Color3.fromRGB(150, 150, 150))
 setDot(false)
 
-task.spawn(function()
-    local conn = isConnected()
-    if conn then
-        running = true
-        setDot(true)
-        showOverlay(true)
-        setStatus("Đang tải frame đầu tiên...", Color3.fromRGB(100, 180, 255))
-        titleLabel.Text = "Stream Viewer · LIVE"
-    else
-        setStatus("Đang chờ streamer kết nối...", Color3.fromRGB(150, 150, 150))
-    end
-end)
-
 frameConnection = RunService.Heartbeat:Connect(mainLoop)
+task.spawn(connectWS)
