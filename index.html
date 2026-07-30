@@ -135,8 +135,8 @@ let statsTimer    = null;
 // JPEG canvas (low-res, for Lua)
 const jpegCanvas = document.createElement('canvas');
 const jpegCtx    = jpegCanvas.getContext('2d');
-jpegCanvas.width  = 640;
-jpegCanvas.height = 360;
+jpegCanvas.width  = 854;
+jpegCanvas.height = 480;
 
 // ── Helpers ───────────────────────────────────────────────────────
 function setStatus(cls, msg) { dot.className = cls; statusText.textContent = msg; }
@@ -169,8 +169,8 @@ async function loadCameras() {
 async function getCamStream(idx) {
   const dev = cameraDevices[idx];
   const vc  = dev
-    ? { deviceId: { exact: dev.deviceId }, frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } }
-    : { facingMode: { ideal: 'environment' }, frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } };
+    ? { deviceId: { exact: dev.deviceId }, frameRate: { ideal: 30 }, width: { ideal: 854 }, height: { ideal: 480 } }
+    : { facingMode: { ideal: 'environment' }, frameRate: { ideal: 30 }, width: { ideal: 854 }, height: { ideal: 480 } };
   return navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
 }
 
@@ -179,7 +179,7 @@ async function acquireStream() {
   if (mode === 'screen') {
     if (!hasDisplayMedia) { const e = new Error(); e.name = 'NotSupportedError'; throw e; }
     return navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: 30, max: 30 }, width: { ideal: 1280 }, height: { ideal: 720 }, cursor: 'always' },
+      video: { frameRate: { ideal: 30, max: 30 }, width: { ideal: 854 }, height: { ideal: 480 }, cursor: 'always' },
       audio: false
     });
   }
@@ -237,7 +237,7 @@ function startJpegSender() {
   // just serves the latest stored frame, so 3fps source is fine for Lua too.
   jpegTimer = setInterval(() => {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    jpegCtx.drawImage(video, 0, 0, 640, 360);
+    jpegCtx.drawImage(video, 0, 0, 854, 480);
     jpegCanvas.toBlob(blob => {
       if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
       blob.arrayBuffer().then(buf => {
