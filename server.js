@@ -2,7 +2,6 @@ const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
 const path = require("path");
-const jpeg = require("jpeg-js");
 
 const app = express();
 const server = http.createServer(app);
@@ -37,7 +36,7 @@ wss.on("connection", (ws, req) => {
   const url = new URL(req.url || "/", "http://x");
   const role = url.searchParams.get("role");
 
-  if (role === "raw-viewer" || role === "jpeg-viewer" || role === "viewer") {
+  if (role === "jpeg-viewer" || role === "viewer" || role === "raw-viewer") {
     wsViewers.add(ws);
     sendJson(ws, { type: "status", connected: streamerConnected });
     ws.on("close", () => wsViewers.delete(ws));
@@ -53,25 +52,10 @@ wss.on("connection", (ws, req) => {
 
   ws.on("message", (data, isBinary) => {
     if (!isBinary) return;
-
-    const buf = Buffer.from(data);
-
-    if (buf[0] === 0xFF && buf[1] === 0xD8) {
-      try {
-        const rawPixels = jpeg.decode(buf, { useTolerantUnknown: true, formatAsRGBA: true });
-        
-        const header = Buffer.alloc(4);
-        header.writeUInt16LE(rawPixels.width, 0);
-        header.writeUInt16LE(rawPixels.height, 2);
-
-        const payload = Buffer.concat([header, rawPixels.data]);
-
-        for (const v of wsViewers) {
-          if (v.readyState === 1) {
-            try { v.send(payload); } catch (_) { wsViewers.delete(v); }
-          }
-        }
-      } catch (_) {}
+    for (const v of wsViewers) {
+      if (v.readyState === 1) {
+        try { v.send(data); } catch (_) { wsViewers.delete(v); }
+      }
     }
   });
 
@@ -87,4 +71,3 @@ wss.on("connection", (ws, req) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-      
