@@ -91,7 +91,6 @@ const BASE   = location.protocol === 'file:' ? 'https://lonelyhubstreaming.onren
 const WS_URL = BASE.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws';
 document.getElementById('server-url').textContent = BASE;
 
-// ── DOM ──────────────────────────────────────────────────────────
 const video        = document.getElementById('preview');
 const placeholder  = document.getElementById('placeholder');
 const dot          = document.getElementById('dot');
@@ -104,13 +103,12 @@ const deviceNote   = document.getElementById('device-note');
 const tabScreen    = document.getElementById('tab-screen');
 const tabCamera    = document.getElementById('tab-camera');
 
-// ── Device detection ─────────────────────────────────────────────
 const ua     = navigator.userAgent;
 const isIOS  = (/iPhone|iPod/.test(ua) || /iPad/.test(ua) ||
                (/Macintosh/.test(ua) && navigator.maxTouchPoints > 4 && !/Chrome/.test(ua)))
                && !/Android/.test(ua);
-const isAndroid       = /Android/.test(ua);
-const hasDisplayMedia = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+const isAndroid        = /Android/.test(ua);
+const hasDisplayMedia  = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
 
 if (isIOS) {
@@ -120,25 +118,22 @@ if (isIOS) {
   switchTab('camera');
 }
 
-// ── State ─────────────────────────────────────────────────────────
 let mode          = 'screen';
 let ws            = null;
 let captureStream = null;
-let recorder      = null;      // MediaRecorder (WebM)
-let jpegTimer     = null;      // interval for JPEG→Lua fallback
+let recorder      = null;
+let jpegTimer     = null;
 let running       = false;
 let cameraDevices = [];
 let cameraIndex   = 0;
 let bytesSent     = 0;
 let statsTimer    = null;
 
-// JPEG canvas (low-res, for Lua)
 const jpegCanvas = document.createElement('canvas');
 const jpegCtx    = jpegCanvas.getContext('2d');
 jpegCanvas.width  = 854;
 jpegCanvas.height = 480;
 
-// ── Helpers ───────────────────────────────────────────────────────
 function setStatus(cls, msg) { dot.className = cls; statusText.textContent = msg; }
 
 function setLive(on) {
@@ -161,7 +156,6 @@ function switchTab(m) {
   if (!isIOS) deviceNote.style.display = 'none';
 }));
 
-// ── Camera helpers ────────────────────────────────────────────────
 async function loadCameras() {
   try { cameraDevices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); }
   catch (_) { cameraDevices = []; }
@@ -174,7 +168,6 @@ async function getCamStream(idx) {
   return navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
 }
 
-// ── Stream acquisition ────────────────────────────────────────────
 async function acquireStream() {
   if (mode === 'screen') {
     if (!hasDisplayMedia) { const e = new Error(); e.name = 'NotSupportedError'; throw e; }
@@ -190,7 +183,6 @@ async function acquireStream() {
   return getCamStream(cameraIndex);
 }
 
-// ── WebSocket ─────────────────────────────────────────────────────
 function connectWS(onOpen) {
   if (ws) { ws.close(); ws = null; }
   ws = new WebSocket(WS_URL);
@@ -200,7 +192,6 @@ function connectWS(onOpen) {
   ws.addEventListener('error', () => ws.close());
 }
 
-// ── MediaRecorder: WebM stream (primary — smooth) ─────────────────
 function startWebmRecorder() {
   if (!hasMediaRecorder) return false;
   const mimeTypes = [
@@ -212,13 +203,12 @@ function startWebmRecorder() {
   const mime = mimeTypes.find(t => MediaRecorder.isTypeSupported(t));
   if (!mime) return false;
 
-  // Tell server which codec is coming
   if (ws && ws.readyState === WebSocket.OPEN)
     ws.send(JSON.stringify({ type: 'codec', value: mime }));
 
   recorder = new MediaRecorder(captureStream, {
     mimeType: mime,
-    videoBitsPerSecond: 2_500_000,  // 2.5 Mbps — good quality
+    videoBitsPerSecond: 2_500_000,
   });
 
   recorder.ondataavailable = (e) => {
@@ -227,14 +217,11 @@ function startWebmRecorder() {
     bytesSent += e.data.size;
   };
 
-  recorder.start(200); // 200ms chunks — ~5 chunk/s, low latency
+  recorder.start(200);
   return true;
 }
 
-// ── JPEG fallback sender: for Lua HTTP polling ────────────────────
 function startJpegSender() {
-  // Low-res, low-quality, every 300ms — Lua script polls at 45fps but server
-  // just serves the latest stored frame, so 3fps source is fine for Lua too.
   jpegTimer = setInterval(() => {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     jpegCtx.drawImage(video, 0, 0, 854, 480);
@@ -247,7 +234,6 @@ function startJpegSender() {
   }, 300);
 }
 
-// ── Stats display ─────────────────────────────────────────────────
 function startStats() {
   let last = 0;
   statsTimer = setInterval(() => {
@@ -257,7 +243,6 @@ function startStats() {
   }, 1000);
 }
 
-// ── Start ─────────────────────────────────────────────────────────
 btnStart.addEventListener('click', async () => {
   if (!navigator.mediaDevices) { setStatus('error', 'Cần HTTPS để stream'); return; }
   deviceNote.style.display = 'none';
@@ -292,15 +277,14 @@ btnStart.addEventListener('click', async () => {
     setLive(true);
     bytesSent = 0;
 
-    const webmOk = startWebmRecorder(); // Primary: WebM for web viewers
-    startJpegSender();                   // Secondary: JPEG for Lua
+    const webmOk = startWebmRecorder();
+    startJpegSender();
     startStats();
 
     if (!webmOk) setStatus('live', 'Stream (JPEG fallback) · ' + mode);
   });
 });
 
-// ── Switch camera ─────────────────────────────────────────────────
 btnSwitchCam.addEventListener('click', async () => {
   if (!running || mode !== 'camera') return;
   await loadCameras();
@@ -320,7 +304,6 @@ btnSwitchCam.addEventListener('click', async () => {
   btnSwitchCam.disabled = false;
 });
 
-// ── Stop ─────────────────────────────────────────────────────────
 function cleanup() {
   running = false;
   if (recorder && recorder.state !== 'inactive') { recorder.stop(); recorder = null; }

@@ -11,25 +11,21 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
 
--- Pipeline config: multiple workers fetch in parallel → frame queue → stable display
-local WORKER_COUNT    = 3       -- concurrent HTTP fetch workers
-local BUF_SLOTS       = 9       -- file slots (3 per worker)
-local DISPLAY_FPS     = 30      -- target display framerate
+local WORKER_COUNT     = 3
+local BUF_SLOTS        = 9
+local DISPLAY_FPS      = 30
 local DISPLAY_INTERVAL = 1 / DISPLAY_FPS
-local STATUS_INTERVAL = 2       -- status check period
-local MAX_QUEUE       = 4       -- max buffered frames (drop oldest beyond this)
+local STATUS_INTERVAL  = 2
+local MAX_QUEUE        = 4
 
--- State
 local running          = false
 local hasFirstFrame    = false
 local lastDisplayTime  = 0
 local lastStatusTime   = 0
 local frameConnection  = nil
 
--- Frame queue: list of ready asset strings
 local frameQueue = {}
 
--- Safe HTTP
 local function safeRequest(url)
     if not httpRequest then return nil end
     local ok, res = pcall(function()
@@ -52,10 +48,6 @@ local function isConnected()
     local ok, data = pcall(HttpService.JSONDecode, HttpService, res.Body)
     return ok and data and data.connected == true
 end
-
----------------------------------------------------------------------------
--- UI
----------------------------------------------------------------------------
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "StreamViewer"
@@ -217,9 +209,6 @@ local function setDot(live)
         or  Color3.fromRGB(60, 60, 60)
 end
 
----------------------------------------------------------------------------
--- Drag
----------------------------------------------------------------------------
 local dragging = false
 local dragStart, startPos
 
@@ -243,9 +232,6 @@ game:GetService("UserInputService").InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
 end)
 
----------------------------------------------------------------------------
--- Stop / close
----------------------------------------------------------------------------
 local function stopStream()
     running = false
     hasFirstFrame = false
@@ -264,12 +250,9 @@ closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
----------------------------------------------------------------------------
--- Fetch workers — run WORKER_COUNT goroutines in parallel, each loops forever
----------------------------------------------------------------------------
 local function pushFrame(asset)
     if #frameQueue >= MAX_QUEUE then
-        table.remove(frameQueue, 1) -- drop oldest to stay fresh
+        table.remove(frameQueue, 1)
     end
     table.insert(frameQueue, asset)
 end
@@ -288,34 +271,26 @@ local function startWorker(slotStart)
                         pcall(function() asset = getcustomasset(fname) end)
                         if asset and asset ~= "" then
                             pushFrame(asset)
-                            -- Show first frame immediately — hide overlay
                             if not hasFirstFrame then
                                 hasFirstFrame = true
                                 showOverlay(false)
                             end
                         end
                     end
-                    slot = (slot % 3) + slotStart -- cycle within this worker's 3 slots
+                    slot = (slot % 3) + slotStart
                 end
             end
-            -- Yield briefly — let other workers run, avoid throttle
             task.wait(0.008)
         end
     end)
 end
 
--- Worker 1 uses slots 1,2,3 — Worker 2: 4,5,6 — Worker 3: 7,8,9
 for i = 1, WORKER_COUNT do
     startWorker((i - 1) * 3 + 1)
 end
 
----------------------------------------------------------------------------
--- Display loop — picks frames from queue at stable framerate
----------------------------------------------------------------------------
 local function displayNextFrame()
     if #frameQueue == 0 then return end
-
-    -- If queue is full, skip ahead to newest (low-latency mode)
     local asset
     if #frameQueue >= MAX_QUEUE then
         asset = frameQueue[#frameQueue]
@@ -323,22 +298,16 @@ local function displayNextFrame()
     else
         asset = table.remove(frameQueue, 1)
     end
-
     inactiveImage.Image = asset
     inactiveImage.ZIndex = 3
     activeImage.ZIndex = 2
     activeImage, inactiveImage = inactiveImage, activeImage
 end
 
----------------------------------------------------------------------------
--- Status check + main heartbeat
----------------------------------------------------------------------------
 local isCheckingStatus = false
 
 local function mainLoop()
     local now = tick()
-
-    -- Status check
     if now - lastStatusTime >= STATUS_INTERVAL and not isCheckingStatus then
         lastStatusTime = now
         isCheckingStatus = true
@@ -361,17 +330,12 @@ local function mainLoop()
             isCheckingStatus = false
         end)
     end
-
-    -- Display at stable framerate from queue
     if running and now - lastDisplayTime >= DISPLAY_INTERVAL then
         lastDisplayTime = now
         displayNextFrame()
     end
 end
 
----------------------------------------------------------------------------
--- Boot
----------------------------------------------------------------------------
 setStatus("Đang kết nối tới server...", Color3.fromRGB(150, 150, 150))
 showOverlay(true)
 setDot(false)

@@ -13,8 +13,6 @@ html, body {
   overflow: hidden;
   color: #fff;
 }
-
-/* ── Top bar ───────────────────────────────────────────────────── */
 #top-bar {
   position: fixed; top: 0; left: 0; right: 0; height: 46px;
   background: rgba(6,6,6,.95); backdrop-filter: blur(14px);
@@ -30,7 +28,6 @@ html, body {
 #dot.live    { background: #22c55e; box-shadow: 0 0 10px #22c55e88; animation: pulse 2s infinite; }
 #dot.offline { background: #ef4444; box-shadow: none; }
 @keyframes pulse { 0%,100%{box-shadow:0 0 6px #22c55e55} 50%{box-shadow:0 0 14px #22c55ecc} }
-
 #status-label { font-size: .83rem; color: #aaa; flex: 1; letter-spacing: .02em; }
 #badge {
   font-size: .7rem; color: #555;
@@ -38,29 +35,21 @@ html, body {
   border-radius: 4px; padding: 2px 8px;
   font-variant-numeric: tabular-nums;
 }
-
-/* ── View area ─────────────────────────────────────────────────── */
 #view-area {
   position: absolute; inset: 46px 0 0 0;
   display: flex; align-items: center; justify-content: center;
 }
-
-/* MJPEG primary — always shown when streaming */
 #mjpeg-img {
   max-width: 100%; max-height: 100%;
   object-fit: contain;
   display: none;
 }
-
-/* MSE video — shown when WebM decode succeeds (smoother) */
 #stream-video {
   max-width: 100%; max-height: 100%;
   object-fit: contain;
   display: none;
   background: transparent;
 }
-
-/* ── Waiting overlay ───────────────────────────────────────────── */
 #overlay {
   position: absolute; inset: 0;
   background: #0d0d0d;
@@ -69,7 +58,6 @@ html, body {
   gap: 20px; z-index: 50;
 }
 #overlay.hidden { display: none; }
-
 .spinner {
   width: 40px; height: 40px;
   border: 3px solid #222;
@@ -78,7 +66,6 @@ html, body {
   animation: spin .75s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-
 #overlay-title  { font-size: 1rem; font-weight: 600; color: #ccc; }
 #overlay-sub    { font-size: .82rem; color: #666; text-align: center; max-width: 260px; line-height: 1.6; }
 #retry-btn {
@@ -87,8 +74,6 @@ html, body {
   background: #111; color: #888; font-size: .82rem; cursor: pointer;
 }
 #retry-btn:hover { background: #1a1a1a; color: #bbb; }
-
-/* footer link */
 #footer-link {
   position: fixed; bottom: 12px; right: 14px;
   font-size: .7rem; color: #2a2a2a; text-decoration: none;
@@ -105,12 +90,8 @@ html, body {
 </div>
 
 <div id="view-area">
-  <!-- MJPEG: luôn hoạt động, supported mọi browser -->
   <img id="mjpeg-img" alt="" />
-  <!-- MSE video: VP8/VP9, mượt hơn nếu browser hỗ trợ -->
   <video id="stream-video" autoplay muted playsinline></video>
-
-  <!-- Overlay khi chưa có stream -->
   <div id="overlay">
     <div class="spinner"></div>
     <div id="overlay-title">Chờ streamer...</div>
@@ -130,7 +111,6 @@ const STATUS_URL = BASE + '/api/status';
 const MJPEG_URL  = BASE + '/api/stream';
 const WS_URL     = WS_BASE + '/ws?role=viewer';
 
-// ── DOM ──────────────────────────────────────────────────────────
 const dot          = document.getElementById('dot');
 const statusLabel  = document.getElementById('status-label');
 const badge        = document.getElementById('badge');
@@ -141,7 +121,6 @@ const retryBtn     = document.getElementById('retry-btn');
 const mjpegImg     = document.getElementById('mjpeg-img');
 const streamVideo  = document.getElementById('stream-video');
 
-// ── State ─────────────────────────────────────────────────────────
 let ws            = null;
 let connected     = false;
 let mseReady      = false;
@@ -153,7 +132,6 @@ let mseCodec      = null;
 
 const hasMSE = typeof MediaSource !== 'undefined';
 
-// ── Helpers ───────────────────────────────────────────────────────
 function showOverlay(title, sub, showRetry = false) {
   overlay.classList.remove('hidden');
   overlayTitle.textContent = title;
@@ -163,23 +141,17 @@ function showOverlay(title, sub, showRetry = false) {
 function hideOverlay() { overlay.classList.add('hidden'); }
 
 function setStatus(cls, label) {
-  dot.className          = cls;
+  dot.className           = cls;
   statusLabel.textContent = label;
 }
 
-// ── MJPEG ─────────────────────────────────────────────────────────
-// Primary display method — works on all browsers, no JS needed per frame
 function startMjpeg() {
   mjpegImg.style.display = 'block';
   mjpegImg.src = MJPEG_URL + '?t=' + Date.now();
-
   mjpegImg.onload = () => {
-    // First frame loaded — hide overlay if connected
     if (connected) hideOverlay();
   };
-
   mjpegImg.onerror = () => {
-    // Server might be sleeping on Render.com free tier
     setTimeout(() => {
       if (connected) mjpegImg.src = MJPEG_URL + '?t=' + Date.now();
     }, 3000);
@@ -191,16 +163,12 @@ function stopMjpeg() {
   mjpegImg.style.display = 'none';
 }
 
-// ── MSE (WebM/VP8/VP9) ────────────────────────────────────────────
-// Enhancement: when streamer sends WebM, we use native video codec for smoother playback
 function initMSE(codec) {
   if (!hasMSE) return;
   if (!MediaSource.isTypeSupported(codec)) {
-    console.log('MSE codec not supported:', codec, '— MJPEG stays');
     return;
   }
 
-  // Clean up previous
   teardownMSE();
 
   mseCodec    = codec;
@@ -216,13 +184,11 @@ function initMSE(codec) {
       sourceBuffer = mediaSource.addSourceBuffer(codec);
       sourceBuffer.mode = 'sequence';
     } catch (e) {
-      console.warn('SourceBuffer error:', e.message);
-      teardownMSE(); // keep MJPEG
+      teardownMSE();
       return;
     }
 
     sourceBuffer.addEventListener('updateend', () => {
-      // Trim buffer to prevent memory growth (keep last 20s)
       try {
         if (sourceBuffer.buffered.length) {
           const end   = sourceBuffer.buffered.end(sourceBuffer.buffered.length - 1);
@@ -241,21 +207,17 @@ function initMSE(codec) {
   }, { once: true });
 
   mediaSource.addEventListener('error', () => {
-    console.warn('MediaSource error — staying on MJPEG');
     teardownMSE();
   }, { once: true });
 
-  // If video actually starts playing, switch display from MJPEG to video
   streamVideo.addEventListener('playing', () => {
     streamVideo.style.display = 'block';
-    mjpegImg.style.display    = 'none'; // hide MJPEG once MSE is confirmed working
+    mjpegImg.style.display    = 'none';
     hideOverlay();
   }, { once: true });
 
-  // Timeout: if video hasn't played in 4s, keep MJPEG
   setTimeout(() => {
     if (streamVideo.style.display === 'none' || streamVideo.paused) {
-      console.log('MSE timeout — keeping MJPEG');
       teardownMSE();
     }
   }, 4000);
@@ -273,7 +235,7 @@ function drainQueue() {
 
 function appendWebm(data) {
   if (!mseReady || !sourceBuffer) {
-    if (chunkQueue.length < 120) chunkQueue.push(data); // cap queue
+    if (chunkQueue.length < 120) chunkQueue.push(data);
     return;
   }
   chunkQueue.push(data);
@@ -291,25 +253,20 @@ function teardownMSE() {
   }
   if (streamVideo.src) {
     URL.revokeObjectURL(streamVideo.src);
-    streamVideo.src     = '';
+    streamVideo.src           = '';
     streamVideo.style.display = 'none';
   }
-  // Restore MJPEG
   if (connected) {
     mjpegImg.style.display = 'block';
     if (!mjpegImg.src || mjpegImg.src === location.href) startMjpeg();
   }
 }
 
-// ── Connected / Disconnected ──────────────────────────────────────
 function onConnected() {
   connected = true;
   setStatus('live', 'LIVE');
   badge.style.display = '';
-  // Start MJPEG immediately — guaranteed visible
   startMjpeg();
-  // Overlay will hide on first MJPEG frame load (mjpegImg.onload)
-  // If MJPEG loads but MSE also works → switches to MSE (smoother)
 }
 
 function onDisconnected() {
@@ -324,7 +281,6 @@ function onDisconnected() {
   );
 }
 
-// ── WebSocket ─────────────────────────────────────────────────────
 function connectWS() {
   if (ws) { try { ws.close(); } catch (_) {} ws = null; }
 
@@ -343,14 +299,12 @@ function connectWS() {
           if (msg.connected && !connected) onConnected();
           else if (!msg.connected && connected) onDisconnected();
         } else if (msg.type === 'codec' && hasMSE) {
-          // Streamer is sending WebM — try to upgrade from MJPEG to MSE
           initMSE(msg.value);
         }
       } catch (_) {}
       return;
     }
 
-    // Binary WebM chunk
     if (e.data instanceof ArrayBuffer && mseCodec) {
       appendWebm(e.data);
     }
@@ -362,7 +316,6 @@ function connectWS() {
   ws.onerror = () => { try { ws.close(); } catch (_) {} };
 }
 
-// ── Stats ──────────────────────────────────────────────────────────
 let prevBytes = 0;
 setInterval(() => {
   if (!connected) return;
@@ -371,7 +324,6 @@ setInterval(() => {
   prevBytes = bytesRx;
 }, 1000);
 
-// ── Poll status (backup, catches missed WS messages) ──────────────
 setInterval(async () => {
   try {
     const r = await fetch(STATUS_URL, { cache: 'no-store' });
@@ -382,11 +334,9 @@ setInterval(async () => {
   } catch (_) {}
 }, 4000);
 
-// ── Boot ──────────────────────────────────────────────────────────
 showOverlay('Đang kết nối...', 'Đang kết nối tới server...');
 connectWS();
 
-// Quick initial status check
 fetch(STATUS_URL, { cache: 'no-store' })
   .then(r => r.json())
   .then(d => {
