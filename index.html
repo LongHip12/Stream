@@ -57,10 +57,23 @@ h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
   font-size: 0.9rem;
   color: #444;
   text-align: center;
-  line-height: 1.8;
+  line-height: 1.9;
   padding: 20px;
 }
 #placeholder strong { color: #666; }
+#mode-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #1a1a1a;
+  color: #555;
+  border: 1px solid #2a2a2a;
+}
+#mode-badge.screen { color: #3b82f6; border-color: #1d3f6b; }
+#mode-badge.camera { color: #f59e0b; border-color: #6b4a00; }
 #controls { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 button {
   padding: 12px 28px;
@@ -74,9 +87,21 @@ button {
 button:active { transform: scale(0.97); }
 button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 #btn-start { background: #3b82f6; color: #fff; }
-#btn-stop { background: #374151; color: #d1d5db; }
-#info { font-size: 0.8rem; color: #555; text-align: center; max-width: 480px; line-height: 1.5; }
-#fps-info { font-size: 0.8rem; color: #555; }
+#btn-stop  { background: #374151; color: #d1d5db; }
+#info { font-size: 0.8rem; color: #555; text-align: center; max-width: 500px; line-height: 1.6; }
+#fps-info { font-size: 0.8rem; color: #444; }
+#https-warn {
+  display: none;
+  padding: 10px 18px;
+  background: #2a1a00;
+  border: 1px solid #6b4000;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: #f59e0b;
+  max-width: 480px;
+  text-align: center;
+  line-height: 1.5;
+}
 </style>
 </head>
 <body>
@@ -92,10 +117,15 @@ button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 <div id="preview-wrap">
   <video id="preview" autoplay muted playsinline></video>
   <div id="placeholder">
-    Nhấn <strong>Bắt đầu Stream</strong> để chia sẻ màn hình<br>
-    <small>Trình duyệt sẽ yêu cầu quyền truy cập màn hình</small><br>
-    <small style="color:#333">Viewer tại: <a id="viewer-link" href="/viewer" target="_blank" style="color:#3b82f6">/viewer</a></small>
+    Nhấn <strong id="btn-label-hint">Bắt đầu Stream</strong> để bắt đầu<br>
+    <span id="hint-sub">Trình duyệt sẽ yêu cầu quyền truy cập màn hình</span><br>
+    <span id="mode-badge" class="screen">Màn hình</span>
   </div>
+</div>
+
+<div id="https-warn">
+  ⚠️ Cần mở trang qua <strong>HTTPS</strong> để stream được.<br>
+  Nếu đang dùng localhost, Chrome/Edge có thể cho phép HTTP.
 </div>
 
 <div id="controls">
@@ -103,54 +133,84 @@ button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
   <button id="btn-stop" disabled>Dừng Stream</button>
 </div>
 
-<p id="info">Server: <span id="server-url"></span></p>
+<p id="info">
+  Server: <span id="server-url"></span> &nbsp;|&nbsp;
+  Viewer: <a id="viewer-link" href="/viewer" target="_blank" style="color:#3b82f6">/viewer</a>
+</p>
 
 <script>
 const BASE_URL = location.protocol === "file:"
   ? "https://lonelyhubstreaming.onrender.com"
   : location.origin;
-
 const WS_URL = BASE_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/ws";
 
 document.getElementById("server-url").textContent = BASE_URL;
 
-const video = document.getElementById("preview");
+const video      = document.getElementById("preview");
 const placeholder = document.getElementById("placeholder");
-const dot = document.getElementById("dot");
+const dot        = document.getElementById("dot");
 const statusText = document.getElementById("status-text");
-const fpsInfo = document.getElementById("fps-info");
-const btnStart = document.getElementById("btn-start");
-const btnStop = document.getElementById("btn-stop");
+const fpsInfo    = document.getElementById("fps-info");
+const btnStart   = document.getElementById("btn-start");
+const btnStop    = document.getElementById("btn-stop");
+const modeBadge  = document.getElementById("mode-badge");
+const hintSub    = document.getElementById("hint-sub");
+const httpsWarn  = document.getElementById("https-warn");
 
 let ws = null;
 let captureStream = null;
-let canvas = document.createElement("canvas");
-let ctx = canvas.getContext("2d");
 let frameLoop = null;
 let running = false;
+let usingCamera = false;
 let frameCount = 0;
 let lastFpsTime = performance.now();
-
-const TARGET_FPS = 30;
-const FRAME_INTERVAL = 1000 / TARGET_FPS;
-const JPEG_QUALITY = 0.82;
-
-function setStatus(state, msg) {
-  statusText.textContent = msg;
-  dot.className = state;
-}
-
 let lastFrameTime = 0;
 
+const TARGET_FPS = 30;
+const FRAME_MS   = 1000 / TARGET_FPS;
+const JPEG_Q     = 0.82;
+
+// ── Capability detection ────────────────────────────────────────────────────
+const hasSecureContext = window.isSecureContext;
+const hasMediaDevices  = !!(navigator.mediaDevices);
+const hasDisplayMedia  = hasMediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function";
+const hasUserMedia     = hasMediaDevices && typeof navigator.mediaDevices.getUserMedia === "function";
+
+if (!hasSecureContext && !hasMediaDevices) {
+  httpsWarn.style.display = "block";
+  btnStart.disabled = true;
+}
+
+if (!hasDisplayMedia && hasUserMedia) {
+  // Mobile: no screen share API — use camera
+  usingCamera = true;
+  modeBadge.textContent = "Camera (mobile)";
+  modeBadge.className = "camera";
+  hintSub.textContent = "Trình duyệt sẽ yêu cầu quyền truy cập camera";
+  btnStart.textContent = "Bắt đầu Stream Camera";
+}
+
+// ── Status ──────────────────────────────────────────────────────────────────
+function setStatus(cls, msg) {
+  statusText.textContent = msg;
+  dot.className = cls;
+}
+
+// ── Canvas setup ─────────────────────────────────────────────────────────────
+const canvas = document.createElement("canvas");
+const ctx = canvas.getContext("2d");
+
+// ── Send frame ───────────────────────────────────────────────────────────────
 function sendFrame() {
-  if (!ws || ws.readyState !== WebSocket.OPEN || !captureStream) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const now = performance.now();
-  if (now - lastFrameTime < FRAME_INTERVAL - 2) return;
+  if (now - lastFrameTime < FRAME_MS - 2) return;
   lastFrameTime = now;
 
-  canvas.width = video.videoWidth || 1280;
+  canvas.width  = video.videoWidth  || 1280;
   canvas.height = video.videoHeight || 720;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
   canvas.toBlob(blob => {
     if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
     blob.arrayBuffer().then(buf => {
@@ -159,26 +219,27 @@ function sendFrame() {
         frameCount++;
         const elapsed = performance.now() - lastFpsTime;
         if (elapsed >= 1000) {
-          fpsInfo.textContent = `· ${Math.round(frameCount * 1000 / elapsed)} fps`;
+          fpsInfo.textContent = "· " + Math.round(frameCount * 1000 / elapsed) + " fps";
           frameCount = 0;
           lastFpsTime = performance.now();
         }
       }
     });
-  }, "image/jpeg", JPEG_QUALITY);
+  }, "image/jpeg", JPEG_Q);
 }
 
+// ── WebSocket ────────────────────────────────────────────────────────────────
 function connectWS() {
   if (ws) { ws.close(); ws = null; }
   ws = new WebSocket(WS_URL);
   ws.binaryType = "arraybuffer";
 
   ws.addEventListener("open", () => {
-    setStatus("live", "Đang stream · 30fps");
+    setStatus("live", "Đang stream · " + (usingCamera ? "Camera" : "Màn hình"));
     running = true;
     btnStart.disabled = true;
-    btnStop.disabled = false;
-    frameLoop = setInterval(sendFrame, 16); // run at 60hz, throttled inside sendFrame
+    btnStop.disabled  = false;
+    frameLoop = setInterval(sendFrame, 16);
   });
 
   ws.addEventListener("close", () => {
@@ -189,11 +250,10 @@ function connectWS() {
     }
   });
 
-  ws.addEventListener("error", () => {
-    ws.close();
-  });
+  ws.addEventListener("error", () => ws.close());
 }
 
+// ── Cleanup ──────────────────────────────────────────────────────────────────
 function cleanup() {
   running = false;
   clearInterval(frameLoop);
@@ -209,44 +269,79 @@ function cleanup() {
   placeholder.style.display = "";
   setStatus("", "Stream đã dừng");
   btnStart.disabled = false;
-  btnStop.disabled = true;
+  btnStop.disabled  = true;
 }
 
+// ── Start ────────────────────────────────────────────────────────────────────
 btnStart.addEventListener("click", async () => {
-  setStatus("", "Đang yêu cầu quyền màn hình...");
-
-  // Check HTTPS requirement
-  if (location.protocol === "file:") {
-    setStatus("error", "Cần mở qua HTTPS hoặc localhost");
+  if (!hasMediaDevices) {
+    setStatus("error", "Cần HTTPS để sử dụng camera/màn hình");
+    httpsWarn.style.display = "block";
     return;
   }
 
+  setStatus("", "Đang yêu cầu quyền...");
+
   try {
-    captureStream = await navigator.mediaDevices.getDisplayMedia({
-      video: {
-        frameRate: { ideal: 30, max: 30 },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        cursor: "always"
-      },
-      audio: false
-    });
+    if (hasDisplayMedia && !usingCamera) {
+      // ── PC / desktop: screen share ────────────────────────────────────────
+      captureStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          frameRate: { ideal: 30, max: 30 },
+          width:     { ideal: 1280 },
+          height:    { ideal: 720  },
+          cursor:    "always"
+        },
+        audio: false
+      });
+    } else {
+      // ── Mobile / no getDisplayMedia: camera fallback ──────────────────────
+      // Try rear camera first; fall back to any camera
+      try {
+        captureStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            frameRate:  { ideal: 30 },
+            width:      { ideal: 1280 },
+            height:     { ideal: 720  }
+          },
+          audio: false
+        });
+      } catch (_) {
+        captureStream = await navigator.mediaDevices.getUserMedia({
+          video: { frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+      }
+      usingCamera = true;
+    }
   } catch (e) {
     if (e.name === "NotAllowedError") {
-      setStatus("error", "Bạn đã từ chối — nhấn lại để thử lại");
-    } else if (e.name === "NotSupportedError") {
-      setStatus("error", "Trình duyệt không hỗ trợ chia sẻ màn hình");
+      setStatus("error", "Đã từ chối quyền — nhấn lại để thử lại");
+    } else if (e.name === "NotFoundError") {
+      setStatus("error", "Không tìm thấy camera/màn hình");
+    } else if (e.name === "NotSupportedError" || e.name === "TypeError") {
+      // getDisplayMedia not supported → try camera
+      try {
+        captureStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", frameRate: { ideal: 30 } },
+          audio: false
+        });
+        usingCamera = true;
+      } catch (e2) {
+        setStatus("error", "Trình duyệt không hỗ trợ: " + (e2.message || e2.name));
+        return;
+      }
     } else {
-      setStatus("error", "Lỗi: " + e.message);
+      setStatus("error", e.message || e.name || "Lỗi không xác định");
+      return;
     }
-    return;
   }
 
   captureStream.getVideoTracks()[0].addEventListener("ended", cleanup);
   video.srcObject = captureStream;
   video.style.display = "block";
   placeholder.style.display = "none";
-
   connectWS();
 });
 
