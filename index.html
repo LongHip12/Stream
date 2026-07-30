@@ -18,7 +18,6 @@ body {
   gap: 18px;
   padding: 20px;
 }
-
 h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
 
 #status-bar {
@@ -66,19 +65,26 @@ h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
   user-select: none;
 }
 #placeholder .pick { color: #555; font-size: 0.95rem; font-weight: 600; }
-#placeholder .ios-note {
+#device-note {
   display: none;
   margin-top: 8px;
   font-size: 0.78rem;
-  color: #6b4a00;
-  background: #1e1400;
-  border: 1px solid #3d2a00;
   border-radius: 6px;
-  padding: 6px 12px;
+  padding: 7px 14px;
   line-height: 1.5;
 }
+#device-note.ios {
+  color: #f59e0b;
+  background: #1e1400;
+  border: 1px solid #3d2a00;
+}
+#device-note.android-old {
+  color: #60a5fa;
+  background: #0e1a2e;
+  border: 1px solid #1e3a5e;
+}
 
-/* ── Mode tabs ────────────────────────────────────────────────── */
+/* Mode tabs */
 #mode-tabs {
   display: flex;
   background: #111;
@@ -101,14 +107,10 @@ h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
   align-items: center;
   gap: 7px;
 }
-.mode-tab.active {
-  background: #1e1e1e;
-  color: #e0e0e0;
-}
+.mode-tab.active { background: #1e1e1e; color: #e0e0e0; }
 .mode-tab:disabled { opacity: 0.35; cursor: not-allowed; }
-.mode-tab svg { flex-shrink: 0; }
 
-/* ── Action buttons ───────────────────────────────────────────── */
+/* Buttons */
 #controls {
   display: flex;
   gap: 10px;
@@ -135,14 +137,8 @@ h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
 }
 #btn-stop { background: #1e1e1e; color: #888; border: 1px solid #2a2a2a; }
 
-#info {
-  font-size: 0.75rem;
-  color: #333;
-  text-align: center;
-  line-height: 1.8;
-}
+#info { font-size: 0.75rem; color: #333; text-align: center; line-height: 1.8; }
 #info a { color: #2563eb; text-decoration: none; }
-#info a:hover { color: #3b82f6; }
 #fps-badge {
   display: inline-block;
   padding: 2px 8px;
@@ -169,23 +165,26 @@ h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
   <div id="placeholder">
     <div class="pick">Chọn chế độ rồi nhấn Bắt đầu</div>
     <div style="margin-top:6px; color:#2a2a2a">
-      Screen: chia sẻ màn hình &nbsp;|&nbsp; Camera: dùng webcam/cam điện thoại
+      Screen: chia sẻ màn hình &nbsp;|&nbsp; Camera: webcam / cam điện thoại
     </div>
-    <div class="ios-note" id="ios-note">
-      ⚠️ iOS Safari không hỗ trợ chia sẻ màn hình qua trình duyệt.<br>
-      Chỉ có thể dùng chế độ Camera trên iPhone/iPad.
-    </div>
+    <div id="device-note"></div>
   </div>
 </div>
 
 <!-- Mode tabs -->
 <div id="mode-tabs">
   <button class="mode-tab active" id="tab-screen" data-mode="screen">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="2" y="3" width="20" height="14" rx="2"/>
+      <path d="M8 21h8M12 17v4"/>
+    </svg>
     Màn hình
   </button>
   <button class="mode-tab" id="tab-camera" data-mode="camera">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M23 7l-7 5 7 5V7z"/>
+      <rect x="1" y="5" width="15" height="14" rx="2"/>
+    </svg>
     Camera
   </button>
 </div>
@@ -207,10 +206,9 @@ const BASE = location.protocol === 'file:'
   ? 'https://lonelyhubstreaming.onrender.com'
   : location.origin;
 const WS_URL = BASE.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws';
-
 document.getElementById('server-url').textContent = BASE;
 
-// ── DOM refs ─────────────────────────────────────────────────────
+// ── DOM ───────────────────────────────────────────────────────────
 const video        = document.getElementById('preview');
 const placeholder  = document.getElementById('placeholder');
 const dot          = document.getElementById('dot');
@@ -219,38 +217,46 @@ const fpsBadge     = document.getElementById('fps-badge');
 const btnStart     = document.getElementById('btn-start');
 const btnSwitchCam = document.getElementById('btn-switch-cam');
 const btnStop      = document.getElementById('btn-stop');
-const iosNote      = document.getElementById('ios-note');
+const deviceNote   = document.getElementById('device-note');
 const tabScreen    = document.getElementById('tab-screen');
 const tabCamera    = document.getElementById('tab-camera');
 
-// ── State ────────────────────────────────────────────────────────
-let mode          = 'screen';   // 'screen' | 'camera'
+// ── Device detection (conservative — only flag true iOS) ──────────
+// Android Chrome userAgent always contains "Android", never "iPhone/iPad/iPod" alone
+const ua    = navigator.userAgent;
+const isIOS = (/iPhone|iPod/.test(ua) ||
+               (/iPad/.test(ua)) ||
+               // iPadOS 13+ reports as Macintosh but has touch + no Chrome
+               (/Macintosh/.test(ua) && navigator.maxTouchPoints > 4 && !/Chrome/.test(ua))
+              ) && !/Android/.test(ua); // Android Chrome sometimes has weird UAs — never count it as iOS
+
+const isAndroid      = /Android/.test(ua);
+const hasDisplayMedia = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+
+// Show upfront note only on confirmed iOS in Screen mode
+if (isIOS) {
+  deviceNote.className   = 'ios';
+  deviceNote.innerHTML   = '⚠️ iOS Safari không hỗ trợ chia sẻ màn hình.<br>Dùng chế độ <strong>Camera</strong> trên iPhone/iPad.';
+  deviceNote.style.display = 'block';
+  // Pre-select camera
+  switchTab('camera');
+}
+
+// ── State ─────────────────────────────────────────────────────────
+let mode          = 'screen';
 let ws            = null;
 let captureStream = null;
 let frameLoop     = null;
 let running       = false;
+let cameraDevices = [];
+let cameraIndex   = 0;
+let frameCount    = 0;
+let lastFpsTime   = performance.now();
+let lastFrameTime = 0;
 
-let cameraDevices    = [];      // list of videoInput devices
-let cameraIndex      = 0;       // which device is active
-let frameCount       = 0;
-let lastFpsTime      = performance.now();
-let lastFrameTime    = 0;
-
-const TARGET_FPS  = 30;
-const FRAME_MS    = 1000 / TARGET_FPS;
-const JPEG_Q      = 0.82;
-
-// ── iOS detection ─────────────────────────────────────────────────
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const hasDisplayMedia = !!(navigator.mediaDevices?.getDisplayMedia);
-
-// On iOS, warn screen tab won't work
-if (isIOS) {
-  iosNote.style.display = 'block';
-  // Pre-select camera on iOS
-  tabCamera.click();
-}
+const TARGET_FPS = 30;
+const FRAME_MS   = 1000 / TARGET_FPS;
+const JPEG_Q     = 0.82;
 
 // ── Canvas ────────────────────────────────────────────────────────
 const canvas = document.createElement('canvas');
@@ -258,87 +264,79 @@ const ctx    = canvas.getContext('2d');
 
 // ── Helpers ───────────────────────────────────────────────────────
 function setStatus(cls, msg) {
-  dot.className    = cls;
+  dot.className          = cls;
   statusText.textContent = msg;
 }
 
 function setLive(isLive) {
-  btnStart.disabled = isLive;
-  btnStop.disabled  = !isLive;
-  tabScreen.disabled = isLive;
-  tabCamera.disabled = isLive;
+  btnStart.disabled      = isLive;
+  btnStop.disabled       = !isLive;
+  tabScreen.disabled     = isLive;
+  tabCamera.disabled     = isLive;
   fpsBadge.style.display = isLive ? '' : 'none';
   btnSwitchCam.style.display = (isLive && mode === 'camera') ? '' : 'none';
+}
+
+function switchTab(m) {
+  mode = m;
+  tabScreen.classList.toggle('active', m === 'screen');
+  tabCamera.classList.toggle('active', m === 'camera');
 }
 
 // ── Mode tabs ─────────────────────────────────────────────────────
 [tabScreen, tabCamera].forEach(tab => {
   tab.addEventListener('click', () => {
     if (running) return;
-    mode = tab.dataset.mode;
-    tabScreen.classList.toggle('active', mode === 'screen');
-    tabCamera.classList.toggle('active', mode === 'camera');
-    iosNote.style.display = (isIOS && mode === 'screen') ? 'block' : 'none';
+    switchTab(tab.dataset.mode);
+    // Show/hide iOS note based on actual device
+    if (!isIOS) {
+      deviceNote.style.display = 'none';
+    }
   });
 });
 
-// ── Enumerate cameras ─────────────────────────────────────────────
+// ── Camera enumeration ────────────────────────────────────────────
 async function loadCameraList() {
   try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    cameraDevices = devices.filter(d => d.kind === 'videoinput');
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    cameraDevices = devs.filter(d => d.kind === 'videoinput');
   } catch (_) { cameraDevices = []; }
+}
+
+async function getCameraStream(idx) {
+  const dev = cameraDevices[idx];
+  const video = dev
+    ? { deviceId: { exact: dev.deviceId }, frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } }
+    : { facingMode: { ideal: 'environment' }, frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } };
+  return navigator.mediaDevices.getUserMedia({ video, audio: false });
 }
 
 // ── Acquire stream ────────────────────────────────────────────────
 async function acquireStream() {
   if (mode === 'screen') {
-    // Screen capture — works on PC + Android Chrome
+    // Works on: PC Chrome/Firefox/Edge, Android Chrome 72+
+    // Fails on: iOS Safari, very old Chrome
+    if (!hasDisplayMedia) {
+      const err = new Error('getDisplayMedia not available');
+      err.name  = 'NotSupportedError';
+      throw err;
+    }
     return navigator.mediaDevices.getDisplayMedia({
-      video: {
-        frameRate: { ideal: 30, max: 30 },
-        width:     { ideal: 1280 },
-        height:    { ideal: 720 },
-        cursor:    'always'
-      },
+      video: { frameRate: { ideal: 30, max: 30 }, width: { ideal: 1280 }, height: { ideal: 720 }, cursor: 'always' },
       audio: false
     });
-  } else {
-    // Camera
-    await loadCameraList();
-    cameraIndex = 0;
-
-    // Try to find rear camera first on mobile
-    const rearIdx = cameraDevices.findIndex(d =>
-      /back|rear|environment/i.test(d.label)
-    );
-    if (rearIdx !== -1) cameraIndex = rearIdx;
-
-    return getCameraStream(cameraIndex);
   }
+
+  // Camera mode
+  await loadCameraList();
+  cameraIndex = 0;
+  // Prefer rear camera on mobile
+  const rearIdx = cameraDevices.findIndex(d => /back|rear|environment/i.test(d.label));
+  if (rearIdx !== -1) cameraIndex = rearIdx;
+  return getCameraStream(cameraIndex);
 }
 
-async function getCameraStream(idx) {
-  const constraints = { audio: false };
-  if (cameraDevices.length > 0 && cameraDevices[idx]) {
-    constraints.video = {
-      deviceId: { exact: cameraDevices[idx].deviceId },
-      frameRate: { ideal: 30 },
-      width:     { ideal: 1280 },
-      height:    { ideal: 720 }
-    };
-  } else {
-    constraints.video = {
-      facingMode: { ideal: 'environment' },
-      frameRate:  { ideal: 30 },
-      width:      { ideal: 1280 },
-      height:     { ideal: 720 }
-    };
-  }
-  return navigator.mediaDevices.getUserMedia(constraints);
-}
-
-// ── Send frame over WS ────────────────────────────────────────────
+// ── Send frame ────────────────────────────────────────────────────
 function sendFrame() {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   const now = performance.now();
@@ -348,11 +346,10 @@ function sendFrame() {
   canvas.width  = video.videoWidth  || 1280;
   canvas.height = video.videoHeight || 720;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
   canvas.toBlob(blob => {
     if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
     blob.arrayBuffer().then(buf => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
+      if (ws?.readyState === WebSocket.OPEN) {
         ws.send(buf);
         frameCount++;
         const elapsed = performance.now() - lastFpsTime;
@@ -371,14 +368,12 @@ function connectWS() {
   if (ws) { ws.close(); ws = null; }
   ws = new WebSocket(WS_URL);
   ws.binaryType = 'arraybuffer';
-
   ws.addEventListener('open', () => {
     setStatus('live', 'Đang stream · ' + (mode === 'screen' ? 'Màn hình' : 'Camera'));
     running = true;
     setLive(true);
     frameLoop = setInterval(sendFrame, 16);
   });
-
   ws.addEventListener('close', () => {
     clearInterval(frameLoop);
     if (running) {
@@ -386,7 +381,6 @@ function connectWS() {
       setTimeout(connectWS, 2000);
     }
   });
-
   ws.addEventListener('error', () => ws.close());
 }
 
@@ -398,66 +392,75 @@ btnSwitchCam.addEventListener('click', async () => {
     setStatus('live', 'Chỉ có 1 camera');
     return;
   }
-
   cameraIndex = (cameraIndex + 1) % cameraDevices.length;
   btnSwitchCam.disabled = true;
-
   try {
-    // Stop old tracks
     if (captureStream) captureStream.getTracks().forEach(t => t.stop());
-
     captureStream = await getCameraStream(cameraIndex);
     video.srcObject = captureStream;
     captureStream.getVideoTracks()[0].addEventListener('ended', cleanup);
-
-    const label = cameraDevices[cameraIndex]?.label || `Cam ${cameraIndex + 1}`;
-    setStatus('live', 'Camera: ' + label.slice(0, 30));
+    const label = cameraDevices[cameraIndex]?.label || ('Cam ' + (cameraIndex + 1));
+    setStatus('live', 'Camera: ' + label.slice(0, 28));
   } catch (e) {
     setStatus('error', 'Không thể đổi camera: ' + (e.message || e.name));
   }
   btnSwitchCam.disabled = false;
 });
 
-// ── Start ─────────────────────────────────────────────────────────
+// ── Start button ──────────────────────────────────────────────────
 btnStart.addEventListener('click', async () => {
   if (!navigator.mediaDevices) {
     setStatus('error', 'Cần HTTPS để dùng camera/màn hình');
     return;
   }
-
+  deviceNote.style.display = 'none';
   setStatus('', 'Đang yêu cầu quyền...');
 
   try {
     captureStream = await acquireStream();
   } catch (e) {
-    if (e.name === 'NotAllowedError') {
-      setStatus('error', 'Đã từ chối — nhấn lại để thử lại');
-    } else if (e.name === 'NotSupportedError' || !hasDisplayMedia && mode === 'screen') {
-      setStatus('error', 'Trình duyệt không hỗ trợ chia sẻ màn hình — thử chế độ Camera');
-      iosNote.style.display = 'block';
-    } else if (e.name === 'NotFoundError') {
-      setStatus('error', 'Không tìm thấy camera');
+    const name = e.name || '';
+    if (name === 'NotAllowedError') {
+      setStatus('error', 'Đã từ chối quyền — nhấn lại để thử lại');
+    } else if (name === 'NotSupportedError') {
+      // Screen share not available in this browser
+      setStatus('error', 'Trình duyệt chưa hỗ trợ chia sẻ màn hình — thử chế độ Camera');
+      if (isIOS) {
+        deviceNote.className = 'ios';
+        deviceNote.innerHTML = '⚠️ iOS Safari không hỗ trợ chia sẻ màn hình. Dùng chế độ <strong>Camera</strong>.';
+      } else if (isAndroid) {
+        deviceNote.className = 'android-old';
+        deviceNote.innerHTML = 'ℹ️ Android Chrome cũ có thể không hỗ trợ screen share. Cập nhật Chrome hoặc dùng chế độ <strong>Camera</strong>.';
+      } else {
+        deviceNote.className = 'android-old';
+        deviceNote.innerHTML = 'ℹ️ Trình duyệt không hỗ trợ chia sẻ màn hình. Thử Chrome/Edge hoặc dùng <strong>Camera</strong>.';
+      }
+      deviceNote.style.display = 'block';
+    } else if (name === 'NotFoundError') {
+      setStatus('error', 'Không tìm thấy camera/thiết bị');
+    } else if (name === 'AbortError') {
+      setStatus('', 'Đã huỷ');
     } else {
-      setStatus('error', e.message || e.name || 'Lỗi không xác định');
+      setStatus('error', (e.message || name || 'Lỗi không xác định'));
     }
     return;
   }
 
   captureStream.getVideoTracks()[0].addEventListener('ended', cleanup);
-  video.srcObject    = captureStream;
-  video.style.display   = 'block';
+  video.srcObject           = captureStream;
+  video.style.display       = 'block';
   placeholder.style.display = 'none';
   connectWS();
 });
 
-// ── Stop ──────────────────────────────────────────────────────────
+// ── Stop / cleanup ────────────────────────────────────────────────
 function cleanup() {
   running = false;
   clearInterval(frameLoop); frameLoop = null;
   if (ws) { ws.close(); ws = null; }
   if (captureStream) { captureStream.getTracks().forEach(t => t.stop()); captureStream = null; }
-  video.srcObject = null;
-  video.style.display   = 'none';
+  video.srcObject           = null;
+  video.style.display       = 'none';
   placeholder.style.display = '';
   setStatus('', 'Stream đã dừng');
   setLive(false);
