@@ -14,6 +14,7 @@ let latestJpeg = null;
 const mjpegClients  = new Set();
 const wsViewers     = new Set();
 const jpegViewers   = new Set();
+const webmClients   = new Set();
 
 let webmCodec        = null;
 let webmInitChunks   = [];
@@ -55,6 +56,25 @@ app.get("/api/stream", (req, res) => {
   req.on("error",  () => mjpegClients.delete(res));
 });
 
+app.get("/api/stream.webm", (req, res) => {
+  res.setHeader("Content-Type", "video/webm");
+  res.setHeader("Cache-Control", "no-cache, no-store");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Transfer-Encoding", "chunked");
+  res.flushHeaders();
+  
+  webmClients.add(res);
+  
+  if (streamerConnected && webmInitChunks.length > 0) {
+    for (const chunk of webmInitChunks) {
+      res.write(chunk);
+    }
+  }
+  
+  req.on("close", () => webmClients.delete(res));
+  req.on("error", () => webmClients.delete(res));
+});
+
 function pushMjpeg(res, frame) {
   try {
     res.write(`--mjf\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.length}\r\n\r\n`);
@@ -77,6 +97,9 @@ function broadcastWebm(chunk) {
     if (v.readyState === 1) {
       try { v.send(chunk); } catch (_) { wsViewers.delete(v); }
     }
+  }
+  for (const c of webmClients) {
+    try { c.write(chunk); } catch (_) { webmClients.delete(c); }
   }
 }
 
