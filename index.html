@@ -7,189 +7,74 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  background: #0d0d0d;
-  color: #f0f0f0;
+  background: #0d0d0d; color: #f0f0f0;
   font-family: 'Segoe UI', system-ui, sans-serif;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  padding: 20px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 18px; padding: 20px;
 }
-h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
-
-#status-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.9rem;
-  color: #888;
-}
-#dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: #333;
-  transition: background 0.3s, box-shadow 0.3s;
-  flex-shrink: 0;
-}
+h1 { font-size: 1.7rem; font-weight: 700; color: #fff; }
+#status-bar { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; color: #888; }
+#dot { width: 10px; height: 10px; border-radius: 50%; background: #333; transition: background .3s, box-shadow .3s; flex-shrink: 0; }
 #dot.live { background: #22c55e; box-shadow: 0 0 8px #22c55e99; }
 #dot.error { background: #ef4444; }
-
 #preview-wrap {
-  position: relative;
-  width: 720px;
-  max-width: 95vw;
-  aspect-ratio: 16/9;
-  background: #0a0a0a;
-  border: 1px solid #1e1e1e;
-  border-radius: 10px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: relative; width: 720px; max-width: 95vw; aspect-ratio: 16/9;
+  background: #0a0a0a; border: 1px solid #1e1e1e; border-radius: 10px;
+  overflow: hidden; display: flex; align-items: center; justify-content: center;
 }
-#preview {
-  width: 100%; height: 100%;
-  object-fit: contain;
-  display: none;
-  background: #000;
-}
-#placeholder {
-  font-size: 0.88rem;
-  color: #3a3a3a;
-  text-align: center;
-  line-height: 2;
-  padding: 20px;
-  user-select: none;
-}
-#placeholder .pick { color: #555; font-size: 0.95rem; font-weight: 600; }
-#device-note {
-  display: none;
-  margin-top: 8px;
-  font-size: 0.78rem;
-  border-radius: 6px;
-  padding: 7px 14px;
-  line-height: 1.5;
-}
-#device-note.ios {
-  color: #f59e0b;
-  background: #1e1400;
-  border: 1px solid #3d2a00;
-}
-#device-note.android-old {
-  color: #60a5fa;
-  background: #0e1a2e;
-  border: 1px solid #1e3a5e;
-}
-
-/* Mode tabs */
-#mode-tabs {
-  display: flex;
-  background: #111;
-  border: 1px solid #222;
-  border-radius: 10px;
-  padding: 4px;
-  gap: 4px;
-}
-.mode-tab {
-  padding: 9px 22px;
-  border: none;
-  border-radius: 7px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  background: transparent;
-  color: #555;
-  transition: background 0.2s, color 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
+#preview { width: 100%; height: 100%; object-fit: contain; display: none; background: #000; }
+#placeholder { font-size: .88rem; color: #3a3a3a; text-align: center; line-height: 2; padding: 20px; }
+#placeholder .pick { color: #555; font-size: .95rem; font-weight: 600; }
+#device-note { display: none; margin-top: 8px; font-size: .78rem; border-radius: 6px; padding: 7px 14px; line-height: 1.5; }
+#device-note.ios { color: #f59e0b; background: #1e1400; border: 1px solid #3d2a00; }
+#device-note.warn { color: #60a5fa; background: #0e1a2e; border: 1px solid #1e3a5e; }
+#mode-tabs { display: flex; background: #111; border: 1px solid #222; border-radius: 10px; padding: 4px; gap: 4px; }
+.mode-tab { padding: 9px 22px; border: none; border-radius: 7px; font-size: .9rem; font-weight: 600; cursor: pointer; background: transparent; color: #555; transition: background .2s, color .2s; display: flex; align-items: center; gap: 7px; }
 .mode-tab.active { background: #1e1e1e; color: #e0e0e0; }
-.mode-tab:disabled { opacity: 0.35; cursor: not-allowed; }
-
-/* Buttons */
-#controls {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.action-btn {
-  padding: 11px 26px;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
-}
-.action-btn:active { transform: scale(0.97); }
-.action-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+.mode-tab:disabled { opacity: .35; cursor: not-allowed; }
+#controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.action-btn { padding: 11px 26px; border: none; border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; transition: opacity .2s, transform .1s; }
+.action-btn:active { transform: scale(.97); }
+.action-btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
 #btn-start { background: #3b82f6; color: #fff; }
-#btn-switch-cam {
-  display: none;
-  background: #1e3a1e;
-  color: #4ade80;
-  border: 1px solid #2a4a2a;
-}
+#btn-switch-cam { display: none; background: #1e3a1e; color: #4ade80; border: 1px solid #2a4a2a; }
 #btn-stop { background: #1e1e1e; color: #888; border: 1px solid #2a2a2a; }
-
-#info { font-size: 0.75rem; color: #333; text-align: center; line-height: 1.8; }
+#info { font-size: .75rem; color: #333; text-align: center; line-height: 1.8; }
 #info a { color: #2563eb; text-decoration: none; }
-#fps-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  background: #1a1a1a;
-  border-radius: 4px;
-  font-size: 0.72rem;
-  color: #444;
-  font-variant-numeric: tabular-nums;
-}
+#stats { font-size: .72rem; color: #444; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
-
 <h1>Screen Stream</h1>
 
 <div id="status-bar">
   <div id="dot"></div>
   <span id="status-text">Chưa kết nối</span>
-  <span id="fps-badge" style="display:none"></span>
+  <span id="stats"></span>
 </div>
 
 <div id="preview-wrap">
   <video id="preview" autoplay muted playsinline></video>
   <div id="placeholder">
     <div class="pick">Chọn chế độ rồi nhấn Bắt đầu</div>
-    <div style="margin-top:6px; color:#2a2a2a">
-      Screen: chia sẻ màn hình &nbsp;|&nbsp; Camera: webcam / cam điện thoại
-    </div>
+    <div style="margin-top:6px;color:#2a2a2a">Screen: chia sẻ màn hình &nbsp;|&nbsp; Camera: webcam / cam điện thoại</div>
     <div id="device-note"></div>
   </div>
 </div>
 
-<!-- Mode tabs -->
 <div id="mode-tabs">
   <button class="mode-tab active" id="tab-screen" data-mode="screen">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect x="2" y="3" width="20" height="14" rx="2"/>
-      <path d="M8 21h8M12 17v4"/>
-    </svg>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
     Màn hình
   </button>
   <button class="mode-tab" id="tab-camera" data-mode="camera">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M23 7l-7 5 7 5V7z"/>
-      <rect x="1" y="5" width="15" height="14" rx="2"/>
-    </svg>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
     Camera
   </button>
 </div>
 
-<!-- Action buttons -->
 <div id="controls">
   <button class="action-btn" id="btn-start">Bắt đầu Stream</button>
   <button class="action-btn" id="btn-switch-cam">🔄 Đổi cam</button>
@@ -202,18 +87,16 @@ h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: 0.04em; color: #fff; }
 </div>
 
 <script>
-const BASE = location.protocol === 'file:'
-  ? 'https://lonelyhubstreaming.onrender.com'
-  : location.origin;
+const BASE   = location.protocol === 'file:' ? 'https://lonelyhubstreaming.onrender.com' : location.origin;
 const WS_URL = BASE.replace(/^https/, 'wss').replace(/^http/, 'ws') + '/ws';
 document.getElementById('server-url').textContent = BASE;
 
-// ── DOM ───────────────────────────────────────────────────────────
+// ── DOM ──────────────────────────────────────────────────────────
 const video        = document.getElementById('preview');
 const placeholder  = document.getElementById('placeholder');
 const dot          = document.getElementById('dot');
 const statusText   = document.getElementById('status-text');
-const fpsBadge     = document.getElementById('fps-badge');
+const stats        = document.getElementById('stats');
 const btnStart     = document.getElementById('btn-start');
 const btnSwitchCam = document.getElementById('btn-switch-cam');
 const btnStop      = document.getElementById('btn-stop');
@@ -221,24 +104,19 @@ const deviceNote   = document.getElementById('device-note');
 const tabScreen    = document.getElementById('tab-screen');
 const tabCamera    = document.getElementById('tab-camera');
 
-// ── Device detection (conservative — only flag true iOS) ──────────
-// Android Chrome userAgent always contains "Android", never "iPhone/iPad/iPod" alone
-const ua    = navigator.userAgent;
-const isIOS = (/iPhone|iPod/.test(ua) ||
-               (/iPad/.test(ua)) ||
-               // iPadOS 13+ reports as Macintosh but has touch + no Chrome
-               (/Macintosh/.test(ua) && navigator.maxTouchPoints > 4 && !/Chrome/.test(ua))
-              ) && !/Android/.test(ua); // Android Chrome sometimes has weird UAs — never count it as iOS
-
-const isAndroid      = /Android/.test(ua);
+// ── Device detection ─────────────────────────────────────────────
+const ua     = navigator.userAgent;
+const isIOS  = (/iPhone|iPod/.test(ua) || /iPad/.test(ua) ||
+               (/Macintosh/.test(ua) && navigator.maxTouchPoints > 4 && !/Chrome/.test(ua)))
+               && !/Android/.test(ua);
+const isAndroid       = /Android/.test(ua);
 const hasDisplayMedia = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+const hasMediaRecorder = typeof MediaRecorder !== 'undefined';
 
-// Show upfront note only on confirmed iOS in Screen mode
 if (isIOS) {
-  deviceNote.className   = 'ios';
-  deviceNote.innerHTML   = '⚠️ iOS Safari không hỗ trợ chia sẻ màn hình.<br>Dùng chế độ <strong>Camera</strong> trên iPhone/iPad.';
+  deviceNote.className = 'ios';
+  deviceNote.innerHTML = '⚠️ iOS không hỗ trợ chia sẻ màn hình. Dùng chế độ <strong>Camera</strong>.';
   deviceNote.style.display = 'block';
-  // Pre-select camera
   switchTab('camera');
 }
 
@@ -246,35 +124,29 @@ if (isIOS) {
 let mode          = 'screen';
 let ws            = null;
 let captureStream = null;
-let frameLoop     = null;
+let recorder      = null;      // MediaRecorder (WebM)
+let jpegTimer     = null;      // interval for JPEG→Lua fallback
 let running       = false;
 let cameraDevices = [];
 let cameraIndex   = 0;
-let frameCount    = 0;
-let lastFpsTime   = performance.now();
-let lastFrameTime = 0;
+let bytesSent     = 0;
+let statsTimer    = null;
 
-const TARGET_FPS = 30;
-const FRAME_MS   = 1000 / TARGET_FPS;
-const JPEG_Q     = 0.82;
-
-// ── Canvas ────────────────────────────────────────────────────────
-const canvas = document.createElement('canvas');
-const ctx    = canvas.getContext('2d');
+// JPEG canvas (low-res, for Lua)
+const jpegCanvas = document.createElement('canvas');
+const jpegCtx    = jpegCanvas.getContext('2d');
+jpegCanvas.width  = 640;
+jpegCanvas.height = 360;
 
 // ── Helpers ───────────────────────────────────────────────────────
-function setStatus(cls, msg) {
-  dot.className          = cls;
-  statusText.textContent = msg;
-}
+function setStatus(cls, msg) { dot.className = cls; statusText.textContent = msg; }
 
-function setLive(isLive) {
-  btnStart.disabled      = isLive;
-  btnStop.disabled       = !isLive;
-  tabScreen.disabled     = isLive;
-  tabCamera.disabled     = isLive;
-  fpsBadge.style.display = isLive ? '' : 'none';
-  btnSwitchCam.style.display = (isLive && mode === 'camera') ? '' : 'none';
+function setLive(on) {
+  btnStart.disabled  = on;
+  btnStop.disabled   = !on;
+  tabScreen.disabled = on;
+  tabCamera.disabled = on;
+  btnSwitchCam.style.display = (on && mode === 'camera') ? '' : 'none';
 }
 
 function switchTab(m) {
@@ -283,189 +155,185 @@ function switchTab(m) {
   tabCamera.classList.toggle('active', m === 'camera');
 }
 
-// ── Mode tabs ─────────────────────────────────────────────────────
-[tabScreen, tabCamera].forEach(tab => {
-  tab.addEventListener('click', () => {
-    if (running) return;
-    switchTab(tab.dataset.mode);
-    // Show/hide iOS note based on actual device
-    if (!isIOS) {
-      deviceNote.style.display = 'none';
-    }
-  });
-});
+[tabScreen, tabCamera].forEach(t => t.addEventListener('click', () => {
+  if (running) return;
+  switchTab(t.dataset.mode);
+  if (!isIOS) deviceNote.style.display = 'none';
+}));
 
-// ── Camera enumeration ────────────────────────────────────────────
-async function loadCameraList() {
-  try {
-    const devs = await navigator.mediaDevices.enumerateDevices();
-    cameraDevices = devs.filter(d => d.kind === 'videoinput');
-  } catch (_) { cameraDevices = []; }
+// ── Camera helpers ────────────────────────────────────────────────
+async function loadCameras() {
+  try { cameraDevices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); }
+  catch (_) { cameraDevices = []; }
 }
-
-async function getCameraStream(idx) {
+async function getCamStream(idx) {
   const dev = cameraDevices[idx];
-  const video = dev
+  const vc  = dev
     ? { deviceId: { exact: dev.deviceId }, frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } }
     : { facingMode: { ideal: 'environment' }, frameRate: { ideal: 30 }, width: { ideal: 1280 }, height: { ideal: 720 } };
-  return navigator.mediaDevices.getUserMedia({ video, audio: false });
+  return navigator.mediaDevices.getUserMedia({ video: vc, audio: false });
 }
 
-// ── Acquire stream ────────────────────────────────────────────────
+// ── Stream acquisition ────────────────────────────────────────────
 async function acquireStream() {
   if (mode === 'screen') {
-    // Works on: PC Chrome/Firefox/Edge, Android Chrome 72+
-    // Fails on: iOS Safari, very old Chrome
-    if (!hasDisplayMedia) {
-      const err = new Error('getDisplayMedia not available');
-      err.name  = 'NotSupportedError';
-      throw err;
-    }
+    if (!hasDisplayMedia) { const e = new Error(); e.name = 'NotSupportedError'; throw e; }
     return navigator.mediaDevices.getDisplayMedia({
       video: { frameRate: { ideal: 30, max: 30 }, width: { ideal: 1280 }, height: { ideal: 720 }, cursor: 'always' },
       audio: false
     });
   }
-
-  // Camera mode
-  await loadCameraList();
+  await loadCameras();
   cameraIndex = 0;
-  // Prefer rear camera on mobile
-  const rearIdx = cameraDevices.findIndex(d => /back|rear|environment/i.test(d.label));
-  if (rearIdx !== -1) cameraIndex = rearIdx;
-  return getCameraStream(cameraIndex);
-}
-
-// ── Send frame ────────────────────────────────────────────────────
-function sendFrame() {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  const now = performance.now();
-  if (now - lastFrameTime < FRAME_MS - 2) return;
-  lastFrameTime = now;
-
-  canvas.width  = video.videoWidth  || 1280;
-  canvas.height = video.videoHeight || 720;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  canvas.toBlob(blob => {
-    if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
-    blob.arrayBuffer().then(buf => {
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(buf);
-        frameCount++;
-        const elapsed = performance.now() - lastFpsTime;
-        if (elapsed >= 1000) {
-          fpsBadge.textContent = Math.round(frameCount * 1000 / elapsed) + ' fps';
-          frameCount  = 0;
-          lastFpsTime = performance.now();
-        }
-      }
-    });
-  }, 'image/jpeg', JPEG_Q);
+  const rear = cameraDevices.findIndex(d => /back|rear|environment/i.test(d.label));
+  if (rear !== -1) cameraIndex = rear;
+  return getCamStream(cameraIndex);
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────
-function connectWS() {
+function connectWS(onOpen) {
   if (ws) { ws.close(); ws = null; }
   ws = new WebSocket(WS_URL);
   ws.binaryType = 'arraybuffer';
-  ws.addEventListener('open', () => {
-    setStatus('live', 'Đang stream · ' + (mode === 'screen' ? 'Màn hình' : 'Camera'));
-    running = true;
-    setLive(true);
-    frameLoop = setInterval(sendFrame, 16);
-  });
-  ws.addEventListener('close', () => {
-    clearInterval(frameLoop);
-    if (running) {
-      setStatus('error', 'Mất kết nối — thử lại...');
-      setTimeout(connectWS, 2000);
-    }
-  });
+  ws.addEventListener('open', onOpen);
+  ws.addEventListener('close', () => { if (running) { setStatus('error', 'Mất kết nối — thử lại...'); setTimeout(() => connectWS(onOpen), 2000); } });
   ws.addEventListener('error', () => ws.close());
 }
 
-// ── Switch camera mid-stream ──────────────────────────────────────
-btnSwitchCam.addEventListener('click', async () => {
-  if (!running || mode !== 'camera') return;
-  await loadCameraList();
-  if (cameraDevices.length <= 1) {
-    setStatus('live', 'Chỉ có 1 camera');
-    return;
-  }
-  cameraIndex = (cameraIndex + 1) % cameraDevices.length;
-  btnSwitchCam.disabled = true;
-  try {
-    if (captureStream) captureStream.getTracks().forEach(t => t.stop());
-    captureStream = await getCameraStream(cameraIndex);
-    video.srcObject = captureStream;
-    captureStream.getVideoTracks()[0].addEventListener('ended', cleanup);
-    const label = cameraDevices[cameraIndex]?.label || ('Cam ' + (cameraIndex + 1));
-    setStatus('live', 'Camera: ' + label.slice(0, 28));
-  } catch (e) {
-    setStatus('error', 'Không thể đổi camera: ' + (e.message || e.name));
-  }
-  btnSwitchCam.disabled = false;
-});
+// ── MediaRecorder: WebM stream (primary — smooth) ─────────────────
+function startWebmRecorder() {
+  if (!hasMediaRecorder) return false;
+  const mimeTypes = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm;codecs=h264',
+    'video/webm',
+  ];
+  const mime = mimeTypes.find(t => MediaRecorder.isTypeSupported(t));
+  if (!mime) return false;
 
-// ── Start button ──────────────────────────────────────────────────
+  // Tell server which codec is coming
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify({ type: 'codec', value: mime }));
+
+  recorder = new MediaRecorder(captureStream, {
+    mimeType: mime,
+    videoBitsPerSecond: 2_500_000,  // 2.5 Mbps — good quality
+  });
+
+  recorder.ondataavailable = (e) => {
+    if (e.data.size < 1 || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(e.data);
+    bytesSent += e.data.size;
+  };
+
+  recorder.start(200); // 200ms chunks — ~5 chunk/s, low latency
+  return true;
+}
+
+// ── JPEG fallback sender: for Lua HTTP polling ────────────────────
+function startJpegSender() {
+  // Low-res, low-quality, every 300ms — Lua script polls at 45fps but server
+  // just serves the latest stored frame, so 3fps source is fine for Lua too.
+  jpegTimer = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    jpegCtx.drawImage(video, 0, 0, 640, 360);
+    jpegCanvas.toBlob(blob => {
+      if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
+      blob.arrayBuffer().then(buf => {
+        if (ws?.readyState === WebSocket.OPEN) ws.send(buf);
+      });
+    }, 'image/jpeg', 0.55);
+  }, 300);
+}
+
+// ── Stats display ─────────────────────────────────────────────────
+function startStats() {
+  let last = 0;
+  statsTimer = setInterval(() => {
+    const kbps = Math.round((bytesSent - last) * 8 / 1000);
+    stats.textContent = kbps > 0 ? `· ${kbps} kbps` : '';
+    last = bytesSent;
+  }, 1000);
+}
+
+// ── Start ─────────────────────────────────────────────────────────
 btnStart.addEventListener('click', async () => {
-  if (!navigator.mediaDevices) {
-    setStatus('error', 'Cần HTTPS để dùng camera/màn hình');
-    return;
-  }
+  if (!navigator.mediaDevices) { setStatus('error', 'Cần HTTPS để stream'); return; }
   deviceNote.style.display = 'none';
   setStatus('', 'Đang yêu cầu quyền...');
-
   try {
     captureStream = await acquireStream();
   } catch (e) {
-    const name = e.name || '';
-    if (name === 'NotAllowedError') {
-      setStatus('error', 'Đã từ chối quyền — nhấn lại để thử lại');
-    } else if (name === 'NotSupportedError') {
-      // Screen share not available in this browser
-      setStatus('error', 'Trình duyệt chưa hỗ trợ chia sẻ màn hình — thử chế độ Camera');
-      if (isIOS) {
-        deviceNote.className = 'ios';
-        deviceNote.innerHTML = '⚠️ iOS Safari không hỗ trợ chia sẻ màn hình. Dùng chế độ <strong>Camera</strong>.';
-      } else if (isAndroid) {
-        deviceNote.className = 'android-old';
-        deviceNote.innerHTML = 'ℹ️ Android Chrome cũ có thể không hỗ trợ screen share. Cập nhật Chrome hoặc dùng chế độ <strong>Camera</strong>.';
-      } else {
-        deviceNote.className = 'android-old';
-        deviceNote.innerHTML = 'ℹ️ Trình duyệt không hỗ trợ chia sẻ màn hình. Thử Chrome/Edge hoặc dùng <strong>Camera</strong>.';
-      }
+    const n = e.name || '';
+    if (n === 'NotAllowedError') setStatus('error', 'Đã từ chối quyền — nhấn lại để thử');
+    else if (n === 'NotSupportedError') {
+      setStatus('error', 'Không hỗ trợ screen share — thử Camera');
+      deviceNote.className = isIOS ? 'ios' : 'warn';
+      deviceNote.innerHTML = isIOS
+        ? '⚠️ iOS không hỗ trợ chia sẻ màn hình. Dùng Camera.'
+        : 'ℹ️ Cần Chrome/Edge mới hoặc dùng chế độ Camera.';
       deviceNote.style.display = 'block';
-    } else if (name === 'NotFoundError') {
-      setStatus('error', 'Không tìm thấy camera/thiết bị');
-    } else if (name === 'AbortError') {
-      setStatus('', 'Đã huỷ');
-    } else {
-      setStatus('error', (e.message || name || 'Lỗi không xác định'));
     }
+    else if (n === 'NotFoundError') setStatus('error', 'Không tìm thấy camera/thiết bị');
+    else if (n === 'AbortError') setStatus('', 'Đã huỷ');
+    else setStatus('error', e.message || n || 'Lỗi');
     return;
   }
 
   captureStream.getVideoTracks()[0].addEventListener('ended', cleanup);
-  video.srcObject           = captureStream;
-  video.style.display       = 'block';
+  video.srcObject = captureStream;
+  video.style.display = 'block';
   placeholder.style.display = 'none';
-  connectWS();
+
+  connectWS(() => {
+    setStatus('live', 'Đang stream · ' + (mode === 'screen' ? 'Màn hình' : 'Camera'));
+    running = true;
+    setLive(true);
+    bytesSent = 0;
+
+    const webmOk = startWebmRecorder(); // Primary: WebM for web viewers
+    startJpegSender();                   // Secondary: JPEG for Lua
+    startStats();
+
+    if (!webmOk) setStatus('live', 'Stream (JPEG fallback) · ' + mode);
+  });
 });
 
-// ── Stop / cleanup ────────────────────────────────────────────────
+// ── Switch camera ─────────────────────────────────────────────────
+btnSwitchCam.addEventListener('click', async () => {
+  if (!running || mode !== 'camera') return;
+  await loadCameras();
+  if (cameraDevices.length <= 1) { setStatus('live', 'Chỉ có 1 camera'); return; }
+  cameraIndex = (cameraIndex + 1) % cameraDevices.length;
+  btnSwitchCam.disabled = true;
+  try {
+    if (captureStream) captureStream.getTracks().forEach(t => t.stop());
+    if (recorder && recorder.state !== 'inactive') { recorder.stop(); recorder = null; }
+    captureStream = await getCamStream(cameraIndex);
+    video.srcObject = captureStream;
+    captureStream.getVideoTracks()[0].addEventListener('ended', cleanup);
+    startWebmRecorder();
+    const lbl = cameraDevices[cameraIndex]?.label || ('Cam ' + (cameraIndex + 1));
+    setStatus('live', 'Camera: ' + lbl.slice(0, 28));
+  } catch (e) { setStatus('error', 'Lỗi đổi camera: ' + (e.message || e.name)); }
+  btnSwitchCam.disabled = false;
+});
+
+// ── Stop ─────────────────────────────────────────────────────────
 function cleanup() {
   running = false;
-  clearInterval(frameLoop); frameLoop = null;
+  if (recorder && recorder.state !== 'inactive') { recorder.stop(); recorder = null; }
+  clearInterval(jpegTimer); jpegTimer = null;
+  clearInterval(statsTimer); statsTimer = null;
+  stats.textContent = '';
   if (ws) { ws.close(); ws = null; }
   if (captureStream) { captureStream.getTracks().forEach(t => t.stop()); captureStream = null; }
-  video.srcObject           = null;
-  video.style.display       = 'none';
+  video.srcObject = null; video.style.display = 'none';
   placeholder.style.display = '';
   setStatus('', 'Stream đã dừng');
   setLive(false);
 }
-
 btnStop.addEventListener('click', cleanup);
 </script>
 </body>
