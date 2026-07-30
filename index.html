@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screen Stream</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0d0d0d;
+  color: #f0f0f0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+#status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: #aaa;
+}
+#dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #444;
+  transition: background 0.3s;
+}
+#dot.live { background: #22c55e; box-shadow: 0 0 8px #22c55e88; }
+#dot.error { background: #ef4444; }
+#preview-wrap {
+  position: relative;
+  width: 720px;
+  max-width: 95vw;
+  aspect-ratio: 16/9;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#preview {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+#placeholder {
+  font-size: 0.9rem;
+  color: #444;
+  text-align: center;
+  line-height: 1.6;
+}
+#controls {
+  display: flex;
+  gap: 12px;
+}
+button {
+  padding: 12px 28px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+button:active { transform: scale(0.97); }
+button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+#btn-start {
+  background: #3b82f6;
+  color: #fff;
+}
+#btn-stop {
+  background: #374151;
+  color: #d1d5db;
+}
+#info {
+  font-size: 0.8rem;
+  color: #555;
+  text-align: center;
+  max-width: 480px;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<h1>Screen Stream</h1>
+
+<div id="status-bar">
+  <div id="dot"></div>
+  <span id="status-text">Chưa kết nối</span>
+</div>
+
+<div id="preview-wrap">
+  <video id="preview" autoplay muted playsinline></video>
+  <div id="placeholder">Nhấn <strong>Bắt đầu Stream</strong> để chia sẻ màn hình<br><small>Viewer Lua sẽ nhận và hiển thị stream của bạn</small></div>
+</div>
+
+<div id="controls">
+  <button id="btn-start">Bắt đầu Stream</button>
+  <button id="btn-stop" disabled>Dừng Stream</button>
+</div>
+
+<p id="info">Server: <span id="server-url"></span></p>
+
+<script>
+const SERVER_URL = location.protocol === "file:"
+  ? "https://lonelyhubstreaming.onrender.com"
+  : (location.origin.replace(/^http/, "ws") === location.origin
+      ? location.origin
+      : location.origin);
+
+const WS_URL = (location.protocol === "file:"
+  ? "wss://lonelyhubstreaming.onrender.com"
+  : location.origin.replace(/^https/, "wss").replace(/^http/, "ws")) + "/ws";
+
+document.getElementById("server-url").textContent = location.protocol === "file:"
+  ? "https://lonelyhubstreaming.onrender.com"
+  : location.origin;
+
+const video = document.getElementById("preview");
+const placeholder = document.getElementById("placeholder");
+const dot = document.getElementById("dot");
+const statusText = document.getElementById("status-text");
+const btnStart = document.getElementById("btn-start");
+const btnStop = document.getElementById("btn-stop");
+
+let ws = null;
+let captureStream = null;
+let canvas = document.createElement("canvas");
+let ctx = canvas.getContext("2d");
+let frameInterval = null;
+let running = false;
+
+function setStatus(state, msg) {
+  statusText.textContent = msg;
+  dot.className = state;
+}
+
+function cleanup() {
+  running = false;
+  if (frameInterval) { clearInterval(frameInterval); frameInterval = null; }
+  if (ws) { ws.close(); ws = null; }
+  if (captureStream) {
+    captureStream.getTracks().forEach(t => t.stop());
+    captureStream = null;
+  }
+  video.srcObject = null;
+  video.style.display = "none";
+  placeholder.style.display = "";
+  btnStart.disabled = false;
+  btnStop.disabled = true;
+  setStatus("", "Chưa kết nối");
+}
+
+function sendFrame() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !captureStream) return;
+  const track = captureStream.getVideoTracks()[0];
+  if (!track || track.readyState !== "live") { cleanup(); return; }
+  const settings = track.getSettings();
+  canvas.width = Math.min(settings.width || 1280, 1280);
+  canvas.height = Math.min(settings.height || 720, 720);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob(blob => {
+    if (!blob || !ws || ws.readyState !== WebSocket.OPEN) return;
+    blob.arrayBuffer().then(buf => {
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(buf);
+    });
+  }, "image/jpeg", 0.75);
+}
+
+btnStart.addEventListener("click", async () => {
+  try {
+    captureStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+  } catch (e) {
+    setStatus("error", "Từ chối quyền truy cập màn hình");
+    return;
+  }
+
+  captureStream.getVideoTracks()[0].addEventListener("ended", cleanup);
+
+  video.srcObject = captureStream;
+  video.style.display = "block";
+  placeholder.style.display = "none";
+
+  ws = new WebSocket(WS_URL);
+  ws.binaryType = "arraybuffer";
+
+  ws.addEventListener("open", () => {
+    setStatus("live", "Đang stream");
+    running = true;
+    frameInterval = setInterval(sendFrame, 80);
+    btnStart.disabled = true;
+    btnStop.disabled = false;
+  });
+
+  ws.addEventListener("close", () => {
+    cleanup();
+    setStatus("", "Kết nối bị đóng");
+  });
+
+  ws.addEventListener("error", () => {
+    cleanup();
+    setStatus("error", "Lỗi kết nối WebSocket");
+  });
+});
+
+btnStop.addEventListener("click", cleanup);
+</script>
+</body>
+</html>
